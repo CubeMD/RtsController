@@ -47,18 +47,20 @@ public class ClickerAgent : Agent
 
     public override void CollectObservations(VectorSensor sensor)
     {
-        sensor.AddObservation(transform.localPosition.x / halfGroundSize);
-        sensor.AddObservation(transform.localPosition.z / halfGroundSize);
-        sensor.AddObservation(_camera.orthographicSize / cameraMinMaxZoomSize.y);
+        //sensor.AddObservation(transform.localPosition.x / halfGroundSize);
+        //sensor.AddObservation(transform.localPosition.z / halfGroundSize);
+        //sensor.AddObservation(_camera.orthographicSize / cameraMinMaxZoomSize.y);
 
         foreach (Target target in targets)
         {
             if (!target.IsClicked())
             {
-                float[] obs = new[] {target.transform.localPosition.x / halfGroundSize, target.transform.localPosition.z / halfGroundSize};
+                float[] obs = new[] {(target.transform.localPosition.x - transform.localPosition.x) / _camera.orthographicSize, (target.transform.localPosition.z - transform.localPosition.z) / _camera.orthographicSize};
                 bufferSensorComponent.AppendObservation(obs);
             }
         }
+        
+        //Debug.Log($"first target pos {(targets[0].transform.localPosition - transform.localPosition) / _camera.orthographicSize}, cam zoom: {_camera.orthographicSize}");
     }
 
     public override void OnActionReceived(ActionBuffers actions)
