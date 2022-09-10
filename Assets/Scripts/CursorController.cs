@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using MLAgentsDebugTool.Duplicator;
+using Targets;
 using Unity.Collections;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
@@ -113,7 +113,8 @@ public class CursorController : Agent
                 float[] obs = new[] {
                     (target.transform.localPosition.x - transform.localPosition.x) / currentZoom, 
                     (target.transform.localPosition.z - transform.localPosition.z) / currentZoom,
-                    target.GetReward()
+                    target.GetReward(),
+                    target.TryGetComponent(out TerminateTarget _) ? 1 : -1
                 };
                 
                 if (!debugged)
@@ -136,14 +137,17 @@ public class CursorController : Agent
             Mathf.Clamp(continuousActions[0], -1f, 1f),
             Mathf.Clamp(continuousActions[1], -1f, 1f));
         
+        AddReward(-0.01f - 0.1f * continuousAction.y * continuousAction.y);
+        
         if (discreteActions[0] == 1) // zoom
         {
             currentZoom = Mathf.Clamp(currentZoom + continuousAction.y * zoomSpeed, zoomMinMax.x, zoomMinMax.y);
             cameraGizmo.localScale = new Vector3(currentZoom * 2, 1, currentZoom * 2);
-            AddReward(-0.1f - 0.1f * continuousAction.y * continuousAction.y);
             return;
         }
 
+        AddReward(-0.1f * continuousAction.x * continuousAction.x);
+        
         if (discreteActions[0] == 3) //drag
         {
             Vector3 originPos = transform.position;
@@ -177,10 +181,6 @@ public class CursorController : Agent
             if (Physics.Raycast(ray, out RaycastHit hitInfo) && hitInfo.collider.CompareTag("Target"))
             {
                 CollectTarget(hitInfo.collider);
-            }
-            else
-            {
-                AddReward(-0.1f);
             }
         }
         
@@ -216,13 +216,13 @@ public class CursorController : Agent
 
     private void CollectTarget(Collider col)
     {
-        AddReward(col.GetComponent<Target>().Collect());
+        col.GetComponent<Target>().Collect(this);
 
-        if (environmentController.targets.All(x => x.IsClicked()))
-        {
-            AddReward((1f - (float)StepCount / MaxStep) * 100f);
-            EndEpisode();
-        }
+        // if (environmentController.targets.All(x => x.IsClicked()))
+        // {
+        //     AddReward((1f - (float)StepCount / MaxStep) * 100f);
+        //     EndEpisode();
+        // }
     }
     
     private static Vector3 Abs(Vector3 vector)

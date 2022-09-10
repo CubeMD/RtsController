@@ -140,8 +140,8 @@ MonoBehaviour:
     VectorActionDescriptions: []
     VectorActionSpaceType: 0
     hasUpgradedBrainParametersWithActionSpec: 1
-  m_Model: {fileID: 5022602860645237092, guid: 29157f5d48df94f458fcaa834ecae368, type: 3}
-  m_InferenceDevice: 0
+  m_Model: {fileID: 5022602860645237092, guid: c6b1b45acc4c150479f6028cef0ffc38, type: 3}
+  m_InferenceDevice: 2
   m_BehaviorType: 0
   m_BehaviorName: Clicker
   TeamId: 0
@@ -164,7 +164,7 @@ MonoBehaviour:
   agentParameters:
     maxStep: 0
   hasUpgradedFromAgentParameters: 1
-  MaxStep: 12500
+  MaxStep: 2500
   bufferSensorComponent: {fileID: 1293692952763402599}
   environmentController: {fileID: 0}
   cameraGizmo: {fileID: 5896268907107454787}
@@ -183,7 +183,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27ca2d0529f8c7545bc4bd53692786d3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  decisionPeriod: 50
+  decisionPeriod: 10
   takeActionsBetweenDecisions: 0
 --- !u!114 &1293692952763402599
 MonoBehaviour:
@@ -198,7 +198,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_SensorName: BufferSensor
-  m_ObservableSize: 3
+  m_ObservableSize: 4
   m_MaxNumObservables: 50
 --- !u!114 &5218737999795667910
 MonoBehaviour:

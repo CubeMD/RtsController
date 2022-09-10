@@ -1,43 +1,48 @@
 ﻿using System;
 using System.Collections.Generic;
+using Targets;
 using UnityEngine;
 
-namespace MLAgentsDebugTool.Duplicator
+public class EnvironmentController : MonoBehaviour
 {
-    public class EnvironmentController : MonoBehaviour
+    [HideInInspector] public float halfGroundSize;
+        
+    [SerializeField] private GameObject ground;
+
+    [SerializeField] private GaussianTarget gaussianTargetPrefab;
+    [SerializeField] private int numGaussianTargets;
+
+    [SerializeField] private TerminateTarget terminateTargetPrefab;
+
+    public readonly List<Target> targets = new List<Target>();
+        
+
+    public void Initialize()
     {
-        [SerializeField] private GameObject ground;
-        [HideInInspector] public float halfGroundSize;
-        
-        [SerializeField] private Target targetPrefab;
-        [SerializeField] private int numTargets;
-    
-        public readonly List<Target> targets = new List<Target>();
-        
-
-        public void Initialize()
-        {
-            halfGroundSize = ground.transform.localScale.x / 2;
+        halfGroundSize = ground.transform.localScale.x / 2;
             
-            for (int i = 0; i < numTargets; i++)
-            {
-                Target t = Instantiate(targetPrefab, transform);
-                t.Initialize(halfGroundSize);
-                targets.Add(t);
-            }
+        for (int i = 0; i < numGaussianTargets; i++)
+        {
+            GaussianTarget t = Instantiate(gaussianTargetPrefab, transform);
+            t.Initialize(halfGroundSize);
+            targets.Add(t);
         }
 
-        public void ResetTargets()
-        {
-            foreach (Target target in targets)
-            {
-                target.Reset();
-            }
-        }
+        TerminateTarget tt = Instantiate(terminateTargetPrefab, transform);
+        tt.Initialize(halfGroundSize);
+        targets.Add(tt);
+    }
 
-        public void Reset()
+    private void ResetTargets()
+    {
+        foreach (Target target in targets)
         {
-            ResetTargets();
+            target.Reset();
         }
+    }
+
+    public void Reset()
+    {
+        ResetTargets();
     }
 }

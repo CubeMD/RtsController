@@ -4,7 +4,7 @@ using Unity.MLAgents;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace MLAgentsDebugTool.Duplicator
+namespace Tools
 {
     /// <summary>
     /// Duplicates the environment rightwards, taking into account bounds and safety distance.

@@ -45,10 +45,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 754a93b5730349a1b5b3a4d13fffd8e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ground: {fileID: 5031826522309564956}
   halfGroundSize: 0
-  targetPrefab: {fileID: 6426203964700916265, guid: d59ec32ab969a14488fdc4a22182d668, type: 3}
-  numTargets: 50
+  ground: {fileID: 5031826522309564956}
+  gaussianTargetPrefab: {fileID: -8140397653623830707, guid: d59ec32ab969a14488fdc4a22182d668, type: 3}
+  numGaussianTargets: 49
+  terminateTargetPrefab: {fileID: 2929480133645678488, guid: fbd6205707ea5de47bca7554ea246a3a, type: 3}
 --- !u!1001 &623692831023433168
 PrefabInstance:
   m_ObjectHideFlags: 0
