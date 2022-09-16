@@ -2,8 +2,10 @@ using Unity.MLAgents;
 
 namespace Targets
 {
-    public class TerminateTarget : Target
+    public class TerminateEpisodeReclaim : Reclaim
     {
+        public override bool IsTerminating => true;
+
         public override void Collect(Agent agent)
         {
             base.Collect(agent);

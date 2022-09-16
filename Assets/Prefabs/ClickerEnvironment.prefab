@@ -45,11 +45,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 754a93b5730349a1b5b3a4d13fffd8e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  halfGroundSize: 0
-  ground: {fileID: 5031826522309564956}
-  gaussianTargetPrefab: {fileID: -8140397653623830707, guid: d59ec32ab969a14488fdc4a22182d668, type: 3}
-  numGaussianTargets: 49
-  terminateTargetPrefab: {fileID: 2929480133645678488, guid: fbd6205707ea5de47bca7554ea246a3a, type: 3}
+  ground: {fileID: 8490167346486103102}
+  gaussianReclaimPrefab: {fileID: -8140397653623830707, guid: d59ec32ab969a14488fdc4a22182d668, type: 3}
+  numGaussianReclaim: 50
+  commanderPrefab: {fileID: 6001316869220159657, guid: cd3ee9b1e21424d40aee4acf19d8bc4e, type: 3}
+  agents:
+  - {fileID: 6073555764631712557}
 --- !u!1001 &623692831023433168
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -61,6 +62,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: ClickerAgent
       objectReference: {fileID: 0}
+    - target: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
+      propertyPath: environment
+      value: 
+      objectReference: {fileID: 1689441413796829984}
     - target: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
       propertyPath: halfGroundSize
       value: 100
@@ -120,6 +125,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7634054201000015619, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
   m_PrefabInstance: {fileID: 623692831023433168}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &6073555764631712557 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
+  m_PrefabInstance: {fileID: 623692831023433168}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be15ef761016ed3438d474fd07d9d2e1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &1015469240597860026
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -177,11 +193,6 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 4cd32a59b99efdf45a75546deca6de1c, type: 3}
---- !u!1 &5031826522309564956 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 5459216429352834214, guid: 4cd32a59b99efdf45a75546deca6de1c, type: 3}
-  m_PrefabInstance: {fileID: 1015469240597860026}
-  m_PrefabAsset: {fileID: 0}
 --- !u!4 &8490167346486103102 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8918404743924482692, guid: 4cd32a59b99efdf45a75546deca6de1c, type: 3}
