@@ -94,7 +94,7 @@ GameObject:
   - component: {fileID: 3187236744968080228}
   - component: {fileID: 8559114227044686473}
   m_Layer: 0
-  m_Name: SelectionBox
+  m_Name: SelectionGizmo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -263,8 +263,9 @@ MonoBehaviour:
   MaxStep: 2500
   bufferSensorComponent: {fileID: 1293692952763402599}
   environment: {fileID: 0}
+  orderPrefab: {fileID: 8539681309043346067, guid: ade729e9fe4744c49b0a7131f73507b0, type: 3}
   cameraGizmo: {fileID: 5896268907107454787}
-  selectionBox: {fileID: 1552053840769662201}
+  selectionGizmo: {fileID: 1552053840769662201}
   zoomSpeed: 30
   zoomMinMax: {x: 10, y: 100}
   writeHeuristic: 1

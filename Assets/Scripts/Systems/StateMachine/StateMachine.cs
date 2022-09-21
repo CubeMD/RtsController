@@ -1,27 +1,21 @@
 ﻿using System.Collections.Generic;
+using UnityEngine;
 
 namespace Systems.StateMachine
 {
-    public class StateMachine
+    public class StateMachine : MonoBehaviour
     {
         public event System.Action<State> OnActiveStateTerminated;
         public event System.Action<StateMachine> OnStateMachineUpdate;
         public event System.Action<State> OnNewStateBegun;
 
         private State activeState;
+        
         private readonly List<State> stateQueue = new List<State>();
 
-        public StateMachine(State state)
+        public void Update()
         {
-            if (state != null)
-            {
-                SetActiveState(state);
-            }
-        }
-        
-        public StateMachine()
-        {
-            
+            Step();
         }
 
         public void Step()
@@ -74,6 +68,14 @@ namespace Systems.StateMachine
             }
 
             stateQueue.Add(state);
+        }
+
+        public void UnQueueState(State state)
+        {
+            if (activeState == state)
+            {
+                
+            }
         }
 
         /// <summary>

@@ -1,7 +1,5 @@
 using System.Collections.Generic;
-using Orders;
-using Targets;
-using Units;
+using Systems.Orders;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
@@ -12,6 +10,7 @@ public class RtsAgent : Agent
 {
     [SerializeField] private BufferSensorComponent bufferSensorComponent;
     [SerializeField] private Environment environment;
+    [SerializeField] private Order orderPrefab;
     
     [SerializeField] private Transform cameraGizmo;
     [SerializeField] private Transform selectionGizmo;
@@ -28,7 +27,7 @@ public class RtsAgent : Agent
     private readonly List<Unit> selectedUnits = new List<Unit>();
     private float heuristicScrollDelta;
     private Vector2 heuristicCursorPosActionDelta;
-    
+
     private enum ActionType
     {
         None = -1,
@@ -37,7 +36,7 @@ public class RtsAgent : Agent
         LeftDrag = 2,
         RightClick = 3
     }
-    
+
     private enum ShiftActionType
     {
         NoShift,
@@ -81,29 +80,30 @@ public class RtsAgent : Agent
 
         bool debugged = false;
         
-        foreach (Reclaim target in environment.Reclaim)
-        {
-            if (target.Collected)
-            {
-                continue;
-            }
-            
-            float[] obs = 
-            {
-                (target.transform.localPosition.x - transform.localPosition.x) / currentZoom, 
-                (target.transform.localPosition.z - transform.localPosition.z) / currentZoom,
-                target.Reward,
-                target.IsTerminating ? 1 : -1
-            };
-                
-            if (!debugged)
-            {
-                //Debug.Log($"Obs: target: {obs[0]}, {obs[1]}, cam zoom: {zoomObservation}");
-                debugged = true;
-            }
-                
-            bufferSensorComponent.AppendObservation(obs);
-        }
+        // foreach (Reclaim reclaim in environment.Reclaim)
+        // {
+        //
+        //     float[] obs = 
+        //     {
+        //         (reclaim.transform.localPosition.x - transform.localPosition.x) / currentZoom, 
+        //         (reclaim.transform.localPosition.z - transform.localPosition.z) / currentZoom,
+        //         1,
+        //         1
+        //     };
+        //         
+        //     if (!debugged)
+        //     {
+        //         //Debug.Log($"Obs: target: {obs[0]}, {obs[1]}, cam zoom: {zoomObservation}");
+        //         debugged = true;
+        //     }
+        //         
+        //     bufferSensorComponent.AppendObservation(obs);
+        // }
+    }
+
+    public void UnitCollectedMass(float amount)
+    {
+        AddReward(amount);
     }
 
     private void Update()
@@ -181,9 +181,9 @@ public class RtsAgent : Agent
         AddReward(-0.1f * continuousAction.x * continuousAction.x);
 
         Vector3 restrictedOffset = new Vector3(
-            Mathf.Clamp(currentZoom * continuousAction.x, -Environment.halfGroundSize - transform.localPosition.x, Environment.halfGroundSize - transform.localPosition.x),
+            Mathf.Clamp(currentZoom * continuousAction.x, -environment.halfGroundSize - transform.localPosition.x, environment.halfGroundSize - transform.localPosition.x),
             0f,
-            Mathf.Clamp(currentZoom * continuousAction.y, -Environment.halfGroundSize - transform.localPosition.z, Environment.halfGroundSize - transform.localPosition.z));
+            Mathf.Clamp(currentZoom * continuousAction.y, -environment.halfGroundSize - transform.localPosition.z, environment.halfGroundSize - transform.localPosition.z));
         
         if (primaryAction == ActionType.LeftDrag)
         {
@@ -205,20 +205,40 @@ public class RtsAgent : Agent
         }
 
         transform.localPosition += restrictedOffset;
+
+        if (primaryAction != ActionType.RightClick) return;
         
-        if (primaryAction == ActionType.RightClick)
+        Ray ray = new Ray(transform.position + Vector3.up * 25f, Vector3.down);
+
+        if (Physics.Raycast(ray, out RaycastHit hitInfo, 50f, interactableLayerMask))
         {
-            Ray ray = new Ray(transform.position + Vector3.up * 25f, Vector3.down);
-        
-            if (Physics.Raycast(ray, out RaycastHit hitInfo, 50f, interactableLayerMask))
+            Order order = Instantiate(orderPrefab);
+            
+            if (hitInfo.collider.TryGetComponent(out Reclaim reclaim))
             {
-                foreach (Unit selectedUnit in selectedUnits)
-                {
-                    selectedUnit.ContextualAction(hitInfo, secondaryAction == ShiftActionType.Shift);
-                }
+                order.transform.parent = reclaim.transform;
+                order.orderType = OrderType.Reclaim;
+                order.orderData = new Order.ReclaimData(reclaim);
+            }
+            else if (hitInfo.collider.TryGetComponent(out Unit unit) && !environment.UnitBelongsToAgent(unit, this))
+            {
+                order.transform.parent = unit.transform;
+                order.orderType = OrderType.Attack;
+                order.orderData = new Order.AttackData(unit);
+            }
+            else
+            {
+                order.transform.parent = hitInfo.transform;
+                order.orderType = OrderType.Move;
+                order.orderData = new Order.MoveData(hitInfo.point);
+            }
+
+            foreach (Unit selectedUnit in selectedUnits)
+            {
+                selectedUnit.TryAssignOrder(order, secondaryAction == ShiftActionType.Shift);
             }
         }
-
+        
         //Debug.Log($"Agent action is: {continuousAction}, {discreteActions[0]}");
     }
 

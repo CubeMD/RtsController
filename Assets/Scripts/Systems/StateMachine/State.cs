@@ -22,7 +22,7 @@
         /// <summary>
         /// Should be called to signal self completion
         /// </summary>
-        public void SelfTerminate()
+        protected void SelfTerminate()
         {
             Terminate();
             OnSelfTerminate?.Invoke(this);
