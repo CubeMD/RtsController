@@ -12,5 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4f000e452f84d86b6facfdfcd66afec, type: 3}
   m_Name: UEFCommanderReclaimOrderState
   m_EditorClassIdentifier: 
-  defaultReclaimRange: 0
-  defaultReclaimPower: 0
+  orderType: 2
+  defaultReclaimRange: 2.5
+  defaultReclaimPower: 1

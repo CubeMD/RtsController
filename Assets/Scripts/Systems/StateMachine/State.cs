@@ -1,9 +1,11 @@
-﻿namespace Systems.StateMachine
+﻿using System;
+
+namespace Systems.StateMachine
 {
     public abstract class State
     {
-        public event System.Action<State> OnSelfTerminate;
-    
+        public event Action<State> OnStateComplete; 
+        
         /// <summary>
         /// Called by the StateMachine upon its step
         /// </summary>
@@ -15,17 +17,11 @@
         public virtual void Begin() { }
 
         /// <summary>
-        /// Called by the StateMachine when this State terminates
+        /// Called by the StateMachine when this State completes
         /// </summary>
-        public virtual void Terminate() { }
-    
-        /// <summary>
-        /// Should be called to signal self completion
-        /// </summary>
-        protected void SelfTerminate()
+        public virtual void Complete()
         {
-            Terminate();
-            OnSelfTerminate?.Invoke(this);
+            OnStateComplete?.Invoke(this);
         }
     }
 }

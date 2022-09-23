@@ -6,29 +6,24 @@ namespace Systems.StateMachine.States
 {
     public class ExecutingMoveOrderState : ExecutingOrderState
     {
-        private Order.MoveData orderData;
+
+        private MoveData orderData;
         private MoveOrderExecutionModule moveOrderExecutionModule;
         
         public ExecutingMoveOrderState(Unit unit, Order order, MoveOrderExecutionModule moveOrderExecutionModule)
             : base(unit, order)
         {
             this.moveOrderExecutionModule = moveOrderExecutionModule;
-            orderData = order.orderData as Order.MoveData;
+            orderData = order.OrderData as MoveData;
         }
         
         public override void Step()
         {
-            if (orderData == null)
-            {
-                SelfTerminate();
-                return;
-            }
-            
             Vector3 relativePosition = orderData.position - unit.transform.position;
             
-            if (relativePosition.magnitude < moveOrderExecutionModule.stoppingDistance)
+            if (relativePosition.magnitude <= float.Epsilon)
             {
-                SelfTerminate();
+                Complete();
                 return;
             }
 

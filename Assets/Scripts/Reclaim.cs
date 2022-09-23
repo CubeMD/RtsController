@@ -4,7 +4,7 @@ using Random = UnityEngine.Random;
 
 public class Reclaim : MonoBehaviour
 {
-    public Action<Reclaim> onReclaimDestroyed;
+    public event Action<Reclaim> OnReclaimDestroyed;
     
     [SerializeField] private Renderer ren;
     [SerializeField] private Vector2 reclaimMinMax;
@@ -16,20 +16,20 @@ public class Reclaim : MonoBehaviour
         get => amount;
         set
         {
-            
             if (value <= 0)
             {
-                Destroy(this.gameObject);
+                SelfDestroy();
                 return;
             }
+            
             amount = value;
             ren.material.color = gradient.Evaluate(Mathf.InverseLerp(reclaimMinMax.x, reclaimMinMax.y, amount));
         }
     }
-
-    public void SetReclaimMinMax(Vector2 rMinMax)
+    
+    private void OnDestroy()
     {
-        reclaimMinMax = rMinMax;
+        OnReclaimDestroyed?.Invoke(this);
     }
     
     public void SetRandomGaussianAmount(Vector2 rMinMax)
@@ -55,9 +55,14 @@ public class Reclaim : MonoBehaviour
         float sigma = (rMinMax.y - mean) / 3.0f;
         Amount = Mathf.Clamp(std * sigma + mean, rMinMax.x, rMinMax.y);
     }
-
-    private void OnDestroy()
+    
+    private void SetReclaimMinMax(Vector2 rMinMax)
     {
-        onReclaimDestroyed.Invoke(this);
+        reclaimMinMax = rMinMax;
+    }
+
+    private void SelfDestroy()
+    {
+        Destroy(gameObject);
     }
 }

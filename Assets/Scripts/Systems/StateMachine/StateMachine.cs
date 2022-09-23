@@ -1,143 +1,83 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Systems.StateMachine
 {
     public class StateMachine : MonoBehaviour
     {
-        public event System.Action<State> OnActiveStateTerminated;
-        public event System.Action<StateMachine> OnStateMachineUpdate;
-        public event System.Action<State> OnNewStateBegun;
-
-        private State activeState;
-        
         private readonly List<State> stateQueue = new List<State>();
+
+        public State CurrentState => stateQueue.Count > 0 ? stateQueue[0] : null;
 
         public void Update()
         {
-            Step();
-        }
-
-        public void Step()
-        {
-            activeState?.Step();
-
-            OnStateMachineUpdate?.Invoke(this);
-        }
-
-        /// <summary>
-        /// Gets the currently active State for this StateMachine
-        /// </summary>
-        public State GetActiveState()
-        {
-            return activeState;
-        }
-
-        /// <summary>
-        /// Terminates the active State, sets the given State to active immediately and clears the State queue
-        /// </summary>
-        /// <param name="state">State to set active</param>
-        /// <param name="terminateActive">If true, calls OnTerminateState on the active State before the transition</param>
-        public void SetActiveState(State state, bool terminateActive = true)
-        {
-            stateQueue.Clear();
-            TransitionState(state, terminateActive);
-        }
-
-        public void ClearStatesAndTerminate()
-        {
-            stateQueue.Clear();
-            SetActiveState(null);
+            CurrentState?.Step();
         }
         
-        /// <summary>
-        /// Queues a State.  Queued States will become active in order as previous states terminate.
-        /// </summary>
-        /// <param name="state">State to queue</param>
-        public void QueueState(State state)
+        public void AddState(State state, bool fromBeginning = false)
         {
             if (state == null)
             {
+                Debug.LogError("Can not add empty state");
                 return;
             }
 
-            if (activeState == null)
+            state.OnStateComplete += HandleStateComplete;
+            
+            if (fromBeginning)
             {
-                SetActiveState(state);
+                stateQueue.Insert(0, state);
+                stateQueue[0].Begin();
                 return;
             }
 
             stateQueue.Add(state);
         }
 
-        public void UnQueueState(State state)
-        {
-            if (activeState == state)
-            {
-                
-            }
-        }
-
-        /// <summary>
-        /// Queues several States at once
-        /// </summary>
-        /// <param name="states">States to queue, in order</param>
-        public void QueueState(IEnumerable<State> states)
+        public void AddStates(IEnumerable<State> states)
         {
             foreach (State state in states)
             {
-                QueueState(state);
-            }
-        }
-
-        /// <summary>
-        /// Transitions current active State to a new one
-        /// </summary>
-        /// <param name="state">State to transition to</param>
-        /// <param name="terminate">If true, calls OnTerminateState on the active State before the transition</param>
-        private void TransitionState(State state, bool terminate)
-        {
-            if (activeState != null)
-            {
-                if (terminate)
-                {
-                    activeState.Terminate();
-                }
-
-                activeState.OnSelfTerminate -= OnActiveStateSelfTerminate;
-                activeState = null;
-            }
-
-            if (state != null)
-            {
-                activeState = state;
-                activeState.OnSelfTerminate += OnActiveStateSelfTerminate;
-                activeState.Begin();
-
-                if (OnNewStateBegun != null)
-                {
-                    OnNewStateBegun(state);
-                }
+                AddState(state);
             }
         }
         
-        private void OnActiveStateSelfTerminate(State terminatedState)
+        public bool TryRemoveState(State state, bool stateComplete = false)
         {
-            if (stateQueue.Count == 0)
+            if (state == null)
             {
-                TransitionState(null, false);
+                Debug.LogError("Can not remove empty state");
+                return false;
             }
-            else
+            
+            if (stateQueue.Contains(state))
             {
-                State firstQueuedState = stateQueue[0];
-                stateQueue.RemoveAt(0);
-                TransitionState(firstQueuedState, false);
+                if (stateComplete)
+                {
+                    state.Complete();
+                }
+                stateQueue.Remove(state);
+                return true;
             }
 
-            if (OnActiveStateTerminated != null)
+            return false;
+        }
+
+        public void ClearStateQueue(bool completeCurrent = false)
+        {
+            if (completeCurrent)
             {
-                OnActiveStateTerminated(terminatedState);
+                CurrentState.Complete();
             }
+            
+            stateQueue.Clear();
+        }
+
+        private void HandleStateComplete(State state)
+        {
+            state.OnStateComplete -= HandleStateComplete;
+            TryRemoveState(state);
         }
     }
 }

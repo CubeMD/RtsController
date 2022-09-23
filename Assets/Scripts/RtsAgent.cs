@@ -212,34 +212,48 @@ public class RtsAgent : Agent
 
         if (Physics.Raycast(ray, out RaycastHit hitInfo, 50f, interactableLayerMask))
         {
-            Order order = Instantiate(orderPrefab);
+            bool additive = secondaryAction == ShiftActionType.Shift;
             
             if (hitInfo.collider.TryGetComponent(out Reclaim reclaim))
             {
-                order.transform.parent = reclaim.transform;
-                order.orderType = OrderType.Reclaim;
-                order.orderData = new Order.ReclaimData(reclaim);
+                CreateOrderAndAssign(new ReclaimData(reclaim), selectedUnits, additive, reclaim.transform);
             }
             else if (hitInfo.collider.TryGetComponent(out Unit unit) && !environment.UnitBelongsToAgent(unit, this))
             {
-                order.transform.parent = unit.transform;
-                order.orderType = OrderType.Attack;
-                order.orderData = new Order.AttackData(unit);
+                CreateOrderAndAssign(new AttackData(unit), selectedUnits, additive, unit.transform);
             }
             else
             {
-                order.transform.parent = hitInfo.transform;
-                order.orderType = OrderType.Move;
-                order.orderData = new Order.MoveData(hitInfo.point);
-            }
-
-            foreach (Unit selectedUnit in selectedUnits)
-            {
-                selectedUnit.TryAssignOrder(order, secondaryAction == ShiftActionType.Shift);
+                CreateOrderAndAssign(new MoveData(hitInfo.point), selectedUnits, additive, transform.parent, hitInfo.point - transform.parent.position);
             }
         }
         
         //Debug.Log($"Agent action is: {continuousAction}, {discreteActions[0]}");
+    }
+
+    public Order CreateOrderAndAssign(OrderData orderData, IEnumerable<Unit> assignedUnits, bool additive, Transform parent, Vector3 localPosition = new Vector3())
+    {
+        Order order = CreateOrder(orderData, parent, localPosition);
+        order.AddAssignedUnit(assignedUnits, additive);
+        order.CheckEmpty();
+        return order;
+    }
+    
+    public Order CreateOrder(OrderData orderData, Transform parent = null, Vector3 localPosition = new Vector3())
+    {
+        Order order;
+        
+        if (parent == null)
+        {
+            order = Instantiate(orderPrefab, localPosition, Quaternion.identity);
+        }
+        else
+        {
+            order = Instantiate(orderPrefab, parent.position + localPosition, Quaternion.identity, parent);
+        }
+        
+        order.OrderData = orderData;
+        return order;
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)

@@ -13,8 +13,9 @@ namespace Systems.StateMachine.States
             this.order = order;
         }
         
-        public override void Terminate()
+        public override void Complete()
         {
+            base.Complete();
             if (order != null)
             {
                 order.TryRemoveUnit(unit);

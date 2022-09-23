@@ -7,8 +7,7 @@ namespace Templates.Modules
     public class MovementModuleTemplate : OrderModuleTemplate
     {
         public float defaultMovementSpeed;
-        public float defaultStoppingDistance;
-        
+
         public override Module GetModule()
         {
             return new MoveOrderExecutionModule(this);

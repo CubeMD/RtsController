@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Systems.Modules;
 using Systems.Orders;
 using Systems.StateMachine;
@@ -9,16 +11,31 @@ using UnityEngine;
 
 public class Unit : MonoBehaviour
 {
+    public event Action<Unit> OnUnitDestroyed;
+    
     [SerializeField] private UnitTemplate unitTemplate;
-
     [SerializeField] private StateMachine unitStateMachine;
 
-    private List<Module> unitModules = new List<Module>();
+    public RtsAgent Owner { get; private set; }
 
-    private Dictionary<OrderType, OrderExecutionModule> availableOrders = new Dictionary<OrderType, OrderExecutionModule>();
+    private readonly List<Module> unitModules = new List<Module>();
+    
+    private readonly Dictionary<OrderType, OrderExecutionModule> availableOrders 
+        = new Dictionary<OrderType, OrderExecutionModule>();
 
-    public void SetUnitTemplate(UnitTemplate template)
+    private readonly Dictionary<Order, List<ExecutingOrderState>> scheduledOrders =
+        new Dictionary<Order, List<ExecutingOrderState>>();
+
+    private void OnDestroy()
     {
+        OnUnitDestroyed?.Invoke(this);
+        
+        UnAssignAllOrders();
+    }
+
+    public void SetUnit(UnitTemplate template, RtsAgent unitOwner)
+    {
+        Owner = unitOwner;
         unitTemplate = template;
         
         foreach (ModuleTemplate moduleTemplate in unitTemplate.moduleTemplates)
@@ -40,47 +57,71 @@ public class Unit : MonoBehaviour
         }
     }
     
-    
     public bool TryGetOrderExecutionModule(OrderType orderType, out OrderExecutionModule orderExecutionModule)
     {
         return availableOrders.TryGetValue(orderType, out orderExecutionModule);
     }
     
-    public bool TryAssignOrder(Order order, bool additive)
+    public bool TryAssignOrder(Order order, bool additive, bool subOrder = false)
     {
-        if (TryGetOrderExecutionModule(order.orderType, out OrderExecutionModule orderExecutionModule))
+        if (TryGetOrderExecutionModule(order.OrderData.orderType, out OrderExecutionModule orderExecutionModule))
         {
             ExecutingOrderState executingOrderState = orderExecutionModule.GetState(this, order);
             
-            if (additive)
+            if (!additive)
             {
-                unitStateMachine.QueueState(executingOrderState);
-            }
-            else
-            {
-                unitStateMachine.SetActiveState(executingOrderState);
+                UnAssignAllOrders();
             }
 
+            unitStateMachine.AddState(executingOrderState, subOrder);
+
+            scheduledOrders.Add(order, new List<ExecutingOrderState>{executingOrderState});
+            
             return true;
         }
 
         return false;
     }
-    
 
-    
-    public void TerminateCurrentOrder()
+    public bool TryUnAssignOrder(Order order)
     {
-            
+        if (scheduledOrders.ContainsKey(order))
+        {
+            foreach (ExecutingOrderState executingOrderState in scheduledOrders[order])
+            {
+                unitStateMachine.TryRemoveState(executingOrderState);
+            }
+
+            scheduledOrders.Remove(order);
+
+            order.TryRemoveUnit(this);
+            return true;
+        }
+
+        return false;
     }
 
-    public void TerminateAllOrders()
+    public void UnAssignAllOrders()
     {
-            
+        foreach (Order order in scheduledOrders.Keys.ToList())
+        {
+            TryUnAssignOrder(order);
+        }
     }
 
-    public void UnAssignOrder(Order order)
+    public void CreateSubOrder(Order parentOrder, OrderData orderData, Vector3 worldPosition)
     {
-        //TODO: implement
+        if (TryGetOrderExecutionModule(orderData.orderType, out OrderExecutionModule orderExecutionModule))
+        {
+            Order order = Owner.CreateOrder(orderData, Owner.transform.parent, Owner.transform.parent.InverseTransformPoint(worldPosition));
+            
+            order.AddAssignedUnit(this, true);
+            
+            ExecutingOrderState executingOrderState = orderExecutionModule.GetState(this, order);
+            
+            unitStateMachine.AddState(executingOrderState, true);
+
+            scheduledOrders[parentOrder].Add(executingOrderState);
+        }
     }
 }

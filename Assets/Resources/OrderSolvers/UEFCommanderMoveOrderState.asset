@@ -12,5 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 88ea222a14b84170ba0f2a074b414944, type: 3}
   m_Name: UEFCommanderMoveOrderState
   m_EditorClassIdentifier: 
-  defaultMovementSpeed: 0
-  defaultStoppingDistance: 0
+  orderType: 0
+  defaultMovementSpeed: 5
+  defaultStoppingDistance: 2.5
