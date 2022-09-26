@@ -15,7 +15,7 @@ namespace Systems.Orders
         Capture
     }
     
-    public class Order : MonoBehaviour
+    public class Order : MonoBehaviour, INode
     {
         [SerializeField] private Renderer ren;
         
@@ -36,10 +36,39 @@ namespace Systems.Orders
                 {
                     ren.material.color = Color.yellow;
                 }
+                else if (orderData.orderType == OrderType.Attack)
+                {
+                    ren.material.color = Color.red;
+                }
             }
         }
 
         private readonly List<Unit> assignedUnits = new List<Unit>();
+        
+        private void OnDestroy()
+        {
+            foreach (Unit assignedUnit in assignedUnits.ToList())
+            {
+                assignedUnit.TryUnAssignOrder(this);
+            }
+        }
+
+        private void Update()
+        {
+            // if (orderData.parentObject == null)
+            // {
+            //     Destroy(orderData.parentObject.gameObject);
+            // }
+            // if (expr)
+            // {
+            //     
+            // }
+            // if (orderData.parentObject == null)
+            // {
+            //     
+            // }
+            // orderData.parentObject?.che
+        }
 
         public List<Unit> GetAssignedUnits()
         {
@@ -48,7 +77,7 @@ namespace Systems.Orders
 
         public void AddAssignedUnit(Unit unit, bool additive) // TODO: should not pass additive here?
         {
-            if (unit.TryAssignOrder(this, additive, orderData.subOrder))
+            if (unit.TryAssignOrder(this, additive, orderData.parentObject))
             {
                 assignedUnits.Add(unit);
             }
@@ -88,12 +117,9 @@ namespace Systems.Orders
             Destroy(gameObject);
         }
 
-        private void OnDestroy()
+        public Node UpdateNode(Node node)
         {
-            foreach (Unit assignedUnit in assignedUnits.ToList())
-            {
-                assignedUnit.TryUnAssignOrder(this);
-            }
+            throw new NotImplementedException();
         }
     }
 }

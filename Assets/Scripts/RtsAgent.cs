@@ -22,6 +22,7 @@ public class RtsAgent : Agent
 
     [SerializeField] private LayerMask interactableLayerMask;
 
+    private Graph graph = new Graph();
     private Camera cam;
     private float currentZoom;
     private readonly List<Unit> selectedUnits = new List<Unit>();
@@ -80,25 +81,58 @@ public class RtsAgent : Agent
 
         bool debugged = false;
         
-        // foreach (Reclaim reclaim in environment.Reclaim)
-        // {
-        //
-        //     float[] obs = 
-        //     {
-        //         (reclaim.transform.localPosition.x - transform.localPosition.x) / currentZoom, 
-        //         (reclaim.transform.localPosition.z - transform.localPosition.z) / currentZoom,
-        //         1,
-        //         1
-        //     };
-        //         
-        //     if (!debugged)
-        //     {
-        //         //Debug.Log($"Obs: target: {obs[0]}, {obs[1]}, cam zoom: {zoomObservation}");
-        //         debugged = true;
-        //     }
-        //         
-        //     bufferSensorComponent.AppendObservation(obs);
-        // }
+        int i = 0;
+        foreach (Collider collider in Physics.OverlapBox(cameraGizmo.position, cameraGizmo.localScale / 2, Quaternion.identity, interactableLayerMask))
+        {
+            float[] obs = {};
+            
+            if (collider.TryGetComponent(out Reclaim reclaim))
+            {
+                obs = new []
+                {
+                    (collider.transform.localPosition.x - transform.localPosition.x) / currentZoom, 
+                    (collider.transform.localPosition.z - transform.localPosition.z) / currentZoom,
+                    reclaim.Amount,
+                    1,
+                    i++
+                };
+            }
+            else if (collider.TryGetComponent(out Unit unit))
+            {
+                bool own = environment.UnitBelongsToAgent(unit, this);
+                
+                 obs = new []
+                {
+                    (collider.transform.localPosition.x - transform.localPosition.x) / currentZoom, 
+                    (collider.transform.localPosition.z - transform.localPosition.z) / currentZoom,
+                    own ? 1 : 0,
+                    0,
+                    i++
+                };
+            }
+            else if (collider.TryGetComponent(out Order order))
+            {
+                bool own = environment.UnitBelongsToAgent(unit, this);
+                
+                obs = new []
+                {
+                    (collider.transform.localPosition.x - transform.localPosition.x) / currentZoom, 
+                    (collider.transform.localPosition.z - transform.localPosition.z) / currentZoom,
+                    own ? 1 : 0,
+                    0,
+                    i++
+                };
+            }
+
+                
+            if (!debugged)
+            {
+                //Debug.Log($"Obs: target: {obs[0]}, {obs[1]}, cam zoom: {zoomObservation}");
+                debugged = true;
+            }
+                
+            bufferSensorComponent.AppendObservation(obs);
+        }
     }
 
     public void UnitCollectedMass(float amount)

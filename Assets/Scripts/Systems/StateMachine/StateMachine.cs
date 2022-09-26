@@ -15,7 +15,7 @@ namespace Systems.StateMachine
             CurrentState?.Step();
         }
         
-        public void AddState(State state, bool fromBeginning = false)
+        public void AddState(State state, bool toBeginning = false)
         {
             if (state == null)
             {
@@ -25,7 +25,7 @@ namespace Systems.StateMachine
 
             state.OnStateComplete += HandleStateComplete;
             
-            if (fromBeginning)
+            if (toBeginning)
             {
                 stateQueue.Insert(0, state);
                 stateQueue[0].Begin();

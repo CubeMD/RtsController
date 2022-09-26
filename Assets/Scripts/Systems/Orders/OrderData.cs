@@ -5,19 +5,18 @@ namespace Systems.Orders
     public abstract class OrderData
     {
         public OrderType orderType;
-        public bool subOrder;
+        public MonoBehaviour parentObject;
     }
     
     public class MoveData : OrderData
     {
         public Vector3 position;
 
-        public MoveData(Vector3 position, bool subOrder = false)
+        public MoveData(Vector3 position, Order parentOrder = null)
         {
             this.position = position;
             orderType = OrderType.Move;
-            this.subOrder = subOrder;
-
+            parentObject = parentOrder;
         }  
     }
     
@@ -29,6 +28,7 @@ namespace Systems.Orders
         {
             this.unit = unit;
             orderType = OrderType.Attack;
+            parentObject = unit;
         }
     }
     
@@ -40,6 +40,7 @@ namespace Systems.Orders
         {
             this.reclaim = reclaim;
             orderType = OrderType.Reclaim;
+            parentObject = reclaim;
         }
     }
 }

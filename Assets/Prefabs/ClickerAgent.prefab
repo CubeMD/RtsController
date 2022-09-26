@@ -299,7 +299,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_SensorName: BufferSensor
-  m_ObservableSize: 4
+  m_ObservableSize: 5
   m_MaxNumObservables: 50
 --- !u!114 &5218737999795667910
 MonoBehaviour:

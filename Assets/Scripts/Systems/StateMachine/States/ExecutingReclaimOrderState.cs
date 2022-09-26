@@ -37,8 +37,8 @@ namespace Systems.StateMachine.States
             else
             {
                 Vector3 moveOrderDestination = unit.transform.position + reclaimOffset.normalized * (distanceToBeAbleToReclaim + SUB_ORDER_SAFETY_DISTANCE);
-
-                unit.CreateSubOrder(order, new MoveData(moveOrderDestination, true), moveOrderDestination);
+                
+                order.OrderData.parentObject = unit.CreateSubOrder(order, new MoveData(moveOrderDestination, order), moveOrderDestination);
             }
         }
     }

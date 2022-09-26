@@ -15,7 +15,8 @@ public class Unit : MonoBehaviour
     
     [SerializeField] private UnitTemplate unitTemplate;
     [SerializeField] private StateMachine unitStateMachine;
-
+    [SerializeField] private LineRenderer lineRenderer;
+    
     public RtsAgent Owner { get; private set; }
 
     private readonly List<Module> unitModules = new List<Module>();
@@ -23,14 +24,22 @@ public class Unit : MonoBehaviour
     private readonly Dictionary<OrderType, OrderExecutionModule> availableOrders 
         = new Dictionary<OrderType, OrderExecutionModule>();
 
-    private readonly Dictionary<Order, List<ExecutingOrderState>> scheduledOrders =
-        new Dictionary<Order, List<ExecutingOrderState>>();
+    private readonly Dictionary<Order, ExecutingOrderState> scheduledOrders =
+        new Dictionary<Order, ExecutingOrderState>();
 
     private void OnDestroy()
     {
         OnUnitDestroyed?.Invoke(this);
         
         UnAssignAllOrders();
+    }
+
+    private void Update()
+    {
+        foreach (Order order in scheduledOrders.Keys.ToList())
+        {
+            //line
+        }
     }
 
     public void SetUnit(UnitTemplate template, RtsAgent unitOwner)
@@ -75,7 +84,7 @@ public class Unit : MonoBehaviour
 
             unitStateMachine.AddState(executingOrderState, subOrder);
 
-            scheduledOrders.Add(order, new List<ExecutingOrderState>{executingOrderState});
+            scheduledOrders.Add(order, executingOrderState);
             
             return true;
         }
@@ -85,12 +94,9 @@ public class Unit : MonoBehaviour
 
     public bool TryUnAssignOrder(Order order)
     {
-        if (scheduledOrders.ContainsKey(order))
+        while (scheduledOrders.ContainsKey(order))
         {
-            foreach (ExecutingOrderState executingOrderState in scheduledOrders[order])
-            {
-                unitStateMachine.TryRemoveState(executingOrderState);
-            }
+            unitStateMachine.TryRemoveState(scheduledOrders[order]);
 
             scheduledOrders.Remove(order);
 
@@ -109,7 +115,7 @@ public class Unit : MonoBehaviour
         }
     }
 
-    public void CreateSubOrder(Order parentOrder, OrderData orderData, Vector3 worldPosition)
+    public Order CreateSubOrder(Order parentOrder, OrderData orderData, Vector3 worldPosition)
     {
         if (TryGetOrderExecutionModule(orderData.orderType, out OrderExecutionModule orderExecutionModule))
         {
@@ -121,7 +127,12 @@ public class Unit : MonoBehaviour
             
             unitStateMachine.AddState(executingOrderState, true);
 
-            scheduledOrders[parentOrder].Add(executingOrderState);
+            scheduledOrders.Add(order, executingOrderState);
+            
+            return order;
         }
+        
+        Debug.LogError("Could not create sub order");
+        return null;
     }
 }
