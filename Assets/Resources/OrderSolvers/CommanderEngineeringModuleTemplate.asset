@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c4f000e452f84d86b6facfdfcd66afec, type: 3}
-  m_Name: UEFCommanderReclaimOrderState
+  m_Name: CommanderEngineeringModuleTemplate
   m_EditorClassIdentifier: 
-  orderType: 2
+  orderType: 30
   defaultReclaimRange: 2.5
   defaultReclaimPower: 1

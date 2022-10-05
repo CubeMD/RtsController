@@ -8,9 +8,9 @@ namespace Templates.Modules
     {
         public float defaultMovementSpeed;
 
-        public override Module GetModule()
+        public override Module GetModule(Unit unit)
         {
-            return new MoveOrderExecutionModule(this);
+            return new MovementModule(this, unit);
         }
     }
 }

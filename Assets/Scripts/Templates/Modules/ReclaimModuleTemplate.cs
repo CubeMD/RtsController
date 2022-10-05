@@ -8,9 +8,9 @@ namespace Templates.Modules
     {
         public float defaultReclaimRange;
         public float defaultReclaimPower;
-        public override Module GetModule()
+        public override Module GetModule(Unit unit)
         {
-            return new ReclaimOrderExecutionModule(this);
+            return new ReclaimModule(this, unit);
         }
     }
 }

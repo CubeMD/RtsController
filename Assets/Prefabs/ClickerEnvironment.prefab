@@ -55,7 +55,7 @@ MonoBehaviour:
   - {fileID: 6073555764631712557}
   templates:
   - {fileID: 11400000, guid: 7a81450c883149b4f8194f72f5504815, type: 2}
-  numCommanders: 1
+  numCommanders: 10
 --- !u!1001 &623692831023433168
 PrefabInstance:
   m_ObjectHideFlags: 0

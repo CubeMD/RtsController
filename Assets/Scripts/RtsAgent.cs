@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Systems.Orders;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
@@ -22,7 +23,8 @@ public class RtsAgent : Agent
 
     [SerializeField] private LayerMask interactableLayerMask;
 
-    private Graph graph = new Graph();
+    public OrderGraph OrderGraph { get; private set; } = new OrderGraph();
+
     private Camera cam;
     private float currentZoom;
     private readonly List<Unit> selectedUnits = new List<Unit>();
@@ -40,8 +42,8 @@ public class RtsAgent : Agent
 
     private enum ShiftActionType
     {
-        NoShift,
-        Shift
+        NoShift = 0,
+        Shift = 1
     }
     
     private ActionType currentAction = ActionType.None;
@@ -59,6 +61,7 @@ public class RtsAgent : Agent
         transform.localPosition = Vector3.zero;
         selectionGizmo.localScale = Vector3.zero;
         selectionGizmo.localPosition = Vector3.zero;
+        OrderGraph = new OrderGraph();
         
         environment.Reset();
         selectedUnits.Clear();
@@ -131,13 +134,8 @@ public class RtsAgent : Agent
                 debugged = true;
             }
                 
-            bufferSensorComponent.AppendObservation(obs);
+            //bufferSensorComponent.AppendObservation(obs);
         }
-    }
-
-    public void UnitCollectedMass(float amount)
-    {
-        AddReward(amount);
     }
 
     private void Update()
@@ -185,6 +183,33 @@ public class RtsAgent : Agent
                     Mathf.Clamp((cursorWorldPos.z - transform.position.z) / currentZoom, -1f, 1));
             }
         }
+    }
+    
+    public override void Heuristic(in ActionBuffers actionsOut)
+    {
+        ActionSegment<float> continuousActions = actionsOut.ContinuousActions;
+        ActionSegment<int> discreteActions = actionsOut.DiscreteActions;
+        
+        discreteActions[0] = currentAction == ActionType.None ? (int)ActionType.Move : (int)currentAction;
+        discreteActions[1] = (int)currentShiftAction;
+        
+        if (currentAction == ActionType.Zoom)
+        {
+            continuousActions[0] = 0;
+            continuousActions[1] = heuristicScrollDelta;
+        }
+        else
+        {
+            continuousActions[0] = heuristicCursorPosActionDelta.x;
+            continuousActions[1] = heuristicCursorPosActionDelta.y;
+        }
+        
+        heuristicScrollDelta = 0;
+        heuristicCursorPosActionDelta = Vector2.zero;
+        currentAction = ActionType.None;
+        currentShiftAction = ShiftActionType.NoShift;
+
+        //Debug.Log($"Heuristic action: {continuousActions[0]}, {continuousActions[1]}, {discreteActions[0]}");
     }
     
     public override void OnActionReceived(ActionBuffers actions)
@@ -250,27 +275,47 @@ public class RtsAgent : Agent
             
             if (hitInfo.collider.TryGetComponent(out Reclaim reclaim))
             {
-                CreateOrderAndAssign(new ReclaimData(reclaim), selectedUnits, additive, reclaim.transform);
+                CreateOrderAndAssign(new ReclaimOrderData(reclaim), selectedUnits, additive, reclaim.transform);
             }
             else if (hitInfo.collider.TryGetComponent(out Unit unit) && !environment.UnitBelongsToAgent(unit, this))
             {
-                CreateOrderAndAssign(new AttackData(unit), selectedUnits, additive, unit.transform);
+                CreateOrderAndAssign(new AttackOrderData(unit), selectedUnits, additive, unit.transform);
             }
             else
             {
-                CreateOrderAndAssign(new MoveData(hitInfo.point), selectedUnits, additive, transform.parent, hitInfo.point - transform.parent.position);
+                CreateOrderAndAssign(new MoveOrderData(hitInfo.point), selectedUnits, additive, transform.parent, hitInfo.point - transform.parent.position);
             }
         }
         
         //Debug.Log($"Agent action is: {continuousAction}, {discreteActions[0]}");
     }
 
-    public Order CreateOrderAndAssign(OrderData orderData, IEnumerable<Unit> assignedUnits, bool additive, Transform parent, Vector3 localPosition = new Vector3())
+    public void CreateOrderAndAssign(OrderData orderData, List<Unit> assignedUnits, bool additive, Transform parent, Vector3 localPosition = new Vector3())
     {
-        Order order = CreateOrder(orderData, parent, localPosition);
-        order.AddAssignedUnit(assignedUnits, additive);
-        order.CheckEmpty();
-        return order;
+        List<Unit> capableUnits = assignedUnits.Where(unit => unit.CanExecuteOrderType(orderData.orderType)).ToList();
+
+        if (capableUnits.Count > 0)
+        {
+            Order order = CreateOrder(orderData, parent, localPosition);
+        
+            foreach (Unit unit in capableUnits)
+            {
+                if (!additive)
+                {
+                    OrderGraph.RemoveUnitFromAllTransitions(unit);
+                    unit.UnAssignActiveOrder();
+                }
+            
+                if (unit.activeOrder != null)
+                {
+                    OrderGraph.AddUnitToTransitionOrCreateNew(OrderGraph.LastOrderForUnit(unit), order, unit);
+                }
+                else
+                {
+                    unit.TryAssignActiveOrder(order);
+                }
+            }
+        }
     }
     
     public Order CreateOrder(OrderData orderData, Transform parent = null, Vector3 localPosition = new Vector3())
@@ -287,38 +332,18 @@ public class RtsAgent : Agent
         }
         
         order.OrderData = orderData;
+        order.owner = this;
+        OrderGraph.AddOrder(order);
         return order;
     }
-
-    public override void Heuristic(in ActionBuffers actionsOut)
+    
+    public void OrderComplete()
     {
-        ActionSegment<float> continuousActions = actionsOut.ContinuousActions;
-        ActionSegment<int> discreteActions = actionsOut.DiscreteActions;
-        
-        discreteActions[0] = currentAction == ActionType.None ? (int)ActionType.Move : (int)currentAction;
-        discreteActions[1] = (int)currentShiftAction;
-        
-        if (currentAction == ActionType.Zoom)
-        {
-            continuousActions[0] = 0;
-            continuousActions[1] = heuristicScrollDelta;
-        }
-        else
-        {
-            continuousActions[0] = heuristicCursorPosActionDelta.x;
-            continuousActions[1] = heuristicCursorPosActionDelta.y;
-        }
-        
-        heuristicScrollDelta = 0;
-        heuristicCursorPosActionDelta = Vector2.zero;
-        currentAction = ActionType.None;
-        currentShiftAction = ShiftActionType.NoShift;
-
-        //Debug.Log($"Heuristic action: {continuousActions[0]}, {continuousActions[1]}, {discreteActions[0]}");
+        AddReward(0.01f);
     }
     
-    private static Vector3 Abs(Vector3 vector)
+    public void UnitCollectedMass(float amount)
     {
-        return new Vector3(Mathf.Abs(vector.x), Mathf.Abs(vector.y), Mathf.Abs(vector.z));
+        AddReward(amount);
     }
 }

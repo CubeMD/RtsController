@@ -9,9 +9,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 88ea222a14b84170ba0f2a074b414944, type: 3}
-  m_Name: UEFCommanderMoveOrderState
+  m_Script: {fileID: 11500000, guid: 809f6f35e33c426983869abcdc3c80e1, type: 3}
+  m_Name: Commander
   m_EditorClassIdentifier: 
-  orderType: 0
-  defaultMovementSpeed: 5
-  defaultStoppingDistance: 2.5
+  id: Commander
+  moduleTemplates:
+  - {fileID: 11400000, guid: c91a7e7893f928b4491739ff3cd8ecba, type: 2}
+  - {fileID: 11400000, guid: 2953aa82594c02d429ce946aea038230, type: 2}

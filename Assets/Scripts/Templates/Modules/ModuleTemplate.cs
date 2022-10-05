@@ -5,6 +5,6 @@ namespace Templates.Modules
 {
     public abstract class ModuleTemplate : ScriptableObject
     {
-        public abstract Module GetModule();
+        public abstract Module GetModule(Unit unit);
     }
 }

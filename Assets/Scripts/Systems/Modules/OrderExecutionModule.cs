@@ -1,11 +1,26 @@
 ﻿using Systems.Orders;
-using Systems.StateMachine.States;
 
 namespace Systems.Modules
 {
-    public abstract class OrderExecutionModule : Module
+    public class OrderExecutionModule : Module
     {
         public OrderType orderType;
-        public abstract ExecutingOrderState GetState(Unit unit, Order order);
+        
+        public OrderExecutionModule(Unit unit) : base(unit) { }
+
+        public virtual void SetOrder(Order order)
+        {
+            active = true;
+        }
+
+        public virtual void UnSetOrder()
+        {
+            active = false;
+        }
+
+        public virtual void Complete()
+        {
+            unit.HandleUnitCompletedOrder();
+        }
     }
 }

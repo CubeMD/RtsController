@@ -5,7 +5,7 @@ using Random = UnityEngine.Random;
 
 public class Environment : MonoBehaviour
 {
-    private const string COMMANDER_TEMPLATE_ID = "UEFComm";
+    private const string COMMANDER_TEMPLATE_ID = "Commander";
     
     [Header("Ground")]
     [HideInInspector] public float halfGroundSize;
@@ -18,7 +18,7 @@ public class Environment : MonoBehaviour
 
     [Header("Unit")]
     [SerializeField] private Unit unitPrefab;
-    
+
     [SerializeField] private List<RtsAgent> agents;
     [SerializeField] private List<UnitTemplate> templates;
     [SerializeField] private int numCommanders = 1;
@@ -81,7 +81,7 @@ public class Environment : MonoBehaviour
     private Unit SpawnUnit(RtsAgent owner, Vector3 position, UnitTemplate unitTemplate)
     {
         Unit unit = Instantiate(unitPrefab, position, Quaternion.identity, transform);
-        unit.SetUnit(unitTemplate, owner);
+        unit.SetUnitTemplate(unitTemplate, owner);
         unit.OnUnitDestroyed += HandleUnitDestroyed;
         agentUnits[owner].Add(unit);
         return unit;

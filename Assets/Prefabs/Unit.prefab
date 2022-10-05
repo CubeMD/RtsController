@@ -14,8 +14,7 @@ GameObject:
   - component: {fileID: 2389086583334480278}
   - component: {fileID: -2656218227640136325}
   - component: {fileID: 5783598507208318217}
-  - component: {fileID: -2422820724673183142}
-  - component: {fileID: -2087206778386786035}
+  - component: {fileID: 4685051864202134946}
   m_Layer: 6
   m_Name: Unit
   m_TagString: Untagged
@@ -128,21 +127,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b9d341abb8384cce80d8376b148d6149, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  unitTemplate: {fileID: 0}
-  unitStateMachine: {fileID: -2422820724673183142}
---- !u!114 &-2422820724673183142
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7872990510985550682}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5eaf2636a5114319939c502cc934bdc3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!120 &-2087206778386786035
+  lineRenderer: {fileID: 4685051864202134946}
+  activeOrder: {fileID: 0}
+--- !u!120 &4685051864202134946
 LineRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -182,7 +169,9 @@ LineRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Positions: []
+  m_Positions:
+  - {x: 0, y: 0, z: 0}
+  - {x: 0, y: 0, z: 1}
   m_Parameters:
     serializedVersion: 3
     widthMultiplier: 1

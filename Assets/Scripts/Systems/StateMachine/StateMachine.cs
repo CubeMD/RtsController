@@ -1,19 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace Systems.StateMachine
 {
-    public class StateMachine : MonoBehaviour
+    public class StateMachine
     {
         private readonly List<State> stateQueue = new List<State>();
 
         public State CurrentState => stateQueue.Count > 0 ? stateQueue[0] : null;
-
-        public void Update()
-        {
-            CurrentState?.Step();
-        }
         
         public void AddState(State state, bool toBeginning = false)
         {

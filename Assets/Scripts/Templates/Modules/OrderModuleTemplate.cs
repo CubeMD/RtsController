@@ -1,5 +1,4 @@
-﻿using Systems.Modules;
-using Systems.Orders;
+﻿using Systems.Orders;
 
 namespace Templates.Modules
 {
