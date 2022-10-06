@@ -14,52 +14,35 @@ namespace Systems.Orders
         Capture = 16
     }
     
-    public abstract class OrderData
+    public class OrderData
     {
+        public Transform targetTransform;
         public OrderType orderType;
-    }
-    
-    public class MoveOrderData : OrderData
-    {
-        public virtual Vector3 Position { get; }
-
-        public MoveOrderData(Vector3 position)
+        
+        public OrderData(Transform targetTransform, OrderType orderType)
         {
-            Position = position;
-            orderType = OrderType.Move;
-        }  
-    }
-
-    public class MoveTargetOrderData : MoveOrderData
-    {
-        private readonly Transform targetTransform;
-        public override Vector3 Position => targetTransform.position;
-
-        public MoveTargetOrderData(Transform transform) : base(transform.position)
+            this.targetTransform = targetTransform;
+            this.orderType = orderType;
+        }
+        
+        public virtual Vector3 GetOrderPosition()
         {
-            targetTransform = transform;
+            return targetTransform.position;
         }
     }
-    
-    public class AttackOrderData : OrderData
+
+    public class PositionOrderData : OrderData
     {
-        public readonly Unit unit;
-            
-        public AttackOrderData(Unit unit)
+        public Vector3 targetPosition;
+
+        public PositionOrderData(Vector3 targetPosition, Transform targetTransform, OrderType orderType) : base(targetTransform, orderType)
         {
-            this.unit = unit;
-            orderType = OrderType.Attack;
+            this.targetPosition = targetPosition;
         }
-    }
-    
-    public class ReclaimOrderData : OrderData
-    {
-        public readonly Reclaim reclaim;
-            
-        public ReclaimOrderData(Reclaim reclaim)
+        
+        public override Vector3 GetOrderPosition()
         {
-            this.reclaim = reclaim;
-            orderType = OrderType.Reclaim;
+            return targetPosition;
         }
     }
     
@@ -92,7 +75,18 @@ namespace Systems.Orders
                 {
                     ren.material.color = Color.red;
                 }
-                
+            }
+        }
+
+        private void Update()
+        {
+            if (orderData.targetTransform != null)
+            {
+                transform.position = orderData.GetOrderPosition();
+            }
+            else
+            {
+                SelfDestroy();
             }
         }
 
@@ -115,11 +109,7 @@ namespace Systems.Orders
                 CheckHasAssignedUnits();
             }
         }
-
-        /// <summary>
-        /// TODO: THIS IS BAD. VERY VERY VERY BAD
-        /// </summary>
-        /// <returns></returns>
+        
         public bool CheckHasAssignedUnits()
         {
             if (assignedUnits.Count < 1 && !owner.OrderGraph.HasTransitionsToOrder(this))

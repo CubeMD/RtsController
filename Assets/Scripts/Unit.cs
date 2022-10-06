@@ -26,6 +26,7 @@ public class Unit : MonoBehaviour
         if (activeOrder != null)
         {
             activeOrder.UnAssignUnit(this);
+            //Owner.OrderGraph.RemoveUnitFromAllTransitions(this);
         }
         
         OnUnitDestroyed?.Invoke(this);
@@ -74,6 +75,30 @@ public class Unit : MonoBehaviour
         {
             unitModule.Update();
         }
+
+        List<Vector3> points = new List<Vector3> { transform.position + Vector3.up};
+
+        if (activeOrder != null)
+        {
+            Order currentOrder = activeOrder;
+            points.Add(currentOrder.transform.position);
+            
+            while (true)
+            {
+                if (Owner.OrderGraph.TryGetTransition(this, out Transition transition, currentOrder))
+                {
+                    currentOrder = transition.nextOrder;
+                    points.Add(currentOrder.transform.position + Vector3.up);
+                }
+                else
+                {
+                    break;
+                }
+            } 
+        }
+
+        lineRenderer.positionCount = points.Count;
+        lineRenderer.SetPositions(points.ToArray());
     }
     
     public bool TryAssignActiveOrder(Order order)

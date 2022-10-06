@@ -63,6 +63,10 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 7912272080898073893}
     m_Modifications:
+    - target: {fileID: 2175531939623175081, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
+      propertyPath: decisionPeriod
+      value: 25
+      objectReference: {fileID: 0}
     - target: {fileID: 4799327343366791544, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
       propertyPath: m_Name
       value: ClickerAgent

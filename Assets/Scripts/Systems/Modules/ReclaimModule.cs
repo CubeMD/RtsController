@@ -8,7 +8,8 @@ namespace Systems.Modules
     {
         private float reclaimRange;
         private float reclaimPower;
-        private ReclaimOrderData reclaimOrderData;
+        private OrderData reclaimOrderData;
+        private Reclaim reclaim;
 
         public ReclaimModule(ReclaimModuleTemplate reclaimModuleTemplate, Unit unit) : base(unit)
         {
@@ -20,12 +21,16 @@ namespace Systems.Modules
         public override void SetOrder(Order order)
         {
             base.SetOrder(order);
-            reclaimOrderData = order.OrderData as ReclaimOrderData;
+            
+            reclaimOrderData = order.OrderData;
+            reclaim = order.OrderData.targetTransform.GetComponent<Reclaim>();
+            reclaim.OnReclaimDestroyed += HandleReclaimDestroyed;
         }
 
         public override void UnSetOrder()
         {
             base.UnSetOrder();
+            reclaim = null;
             reclaimOrderData = null;
         }
 
@@ -33,19 +38,21 @@ namespace Systems.Modules
         {
             if (active)
             {
-                if (reclaimOrderData.reclaim == null)
-                {
-                    Complete();
-                    return;
-                }
-
-                Vector3 reclaimOffset = reclaimOrderData.reclaim.transform.position - unit.transform.position;
+                Vector3 reclaimOffset = reclaim.transform.position - unit.transform.position;
 
                 if (reclaimOffset.magnitude - reclaimRange <= 0)
                 {
-                    reclaimOrderData.reclaim.Amount -= reclaimPower * Time.deltaTime;
+                    float amount = reclaimPower * Time.deltaTime;
+                    unit.Owner.UnitCollectedMass(amount);
+                    reclaim.Amount -= amount;
                 }
             }
+        }
+
+        private void HandleReclaimDestroyed(Reclaim reclaim)
+        {
+            reclaim.OnReclaimDestroyed -= HandleReclaimDestroyed;
+            Complete();
         }
     }
 }

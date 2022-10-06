@@ -9,7 +9,7 @@ namespace Systems.Modules
     public class MovementModule : OrderExecutionModule
     {
         public float movementSpeed;
-        private MoveOrderData moveOrderData;
+        private OrderData moveOrderData;
         private float stoppingDistance;
         private bool followingTarget;
         private Transform targetTransform;
@@ -27,25 +27,17 @@ namespace Systems.Modules
 
             Type orderDataType = order.OrderData.GetType();
             
-            if (orderDataType == typeof(MoveOrderData))
+            if (orderDataType == typeof(PositionOrderData))
             {
-                moveOrderData = order.OrderData as MoveOrderData;
+                moveOrderData = order.OrderData as PositionOrderData;
                 followingTarget = false;
                 targetTransform = null;
             }
-            else if (orderDataType == typeof(ReclaimOrderData))
+            else if (orderDataType == typeof(OrderData))
             {
-                ReclaimOrderData reclaimOrderData = order.OrderData as ReclaimOrderData;
-                moveOrderData = new MoveTargetOrderData(reclaimOrderData.reclaim.transform);
+                moveOrderData = order.OrderData as OrderData;
                 followingTarget = true;
-                targetTransform = reclaimOrderData.reclaim.transform;
-            }
-            else if (orderDataType == typeof(AttackOrderData))
-            {
-                AttackOrderData attackOrderData = order.OrderData as AttackOrderData;
-                moveOrderData = new MoveTargetOrderData(attackOrderData.unit.transform);
-                followingTarget = true;
-                targetTransform = attackOrderData.unit.transform;
+                targetTransform = order.OrderData.targetTransform;
             }
         }
         
@@ -65,7 +57,7 @@ namespace Systems.Modules
                     return;
                 }
                 
-                Vector3 relativePosition = moveOrderData.Position - unit.transform.position;
+                Vector3 relativePosition = moveOrderData.GetOrderPosition() - unit.transform.position;
             
                 if (relativePosition.magnitude <= stoppingDistance)
                 {

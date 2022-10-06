@@ -92,17 +92,28 @@ namespace Systems.Orders
 
         public void RemoveUnitFromAllTransitions(Unit unit)
         {
+            TryGetUnitTransitions(unit, out List<Transition> transitions);
+                
+            foreach (Transition transition in transitions)
+            {
+                RemoveUnitFromTransition(transition.previousOrder, transition.nextOrder, unit);
+            }
+        }
+
+        public bool TryGetUnitTransitions(Unit unit, out List<Transition> transitions)
+        {
+            transitions = new List<Transition>();
+            
             if (unit.activeOrder == null)
             {
-                return;
+                return false;
             }
-
-            List<Transition> transitions = new List<Transition>();
+            
             Order currentOrder = unit.activeOrder;
 
-            while (true)
+            while (orderTransitionsTable.TryGetValue(currentOrder, out List<Transition> orderTransitions))
             {
-                Transition transition = orderTransitionsTable[currentOrder].FirstOrDefault(orderTransition =>
+                Transition transition = orderTransitions.FirstOrDefault(orderTransition =>
                     orderTransition.previousOrder == currentOrder &&
                     orderTransition.assignedUnits.Contains(unit));
 
@@ -111,14 +122,11 @@ namespace Systems.Orders
                     break;
                 }
                 
-                transitions.Insert(0, transition);
+                transitions.Add(transition);
                 currentOrder = transition.nextOrder;
             }
-
-            foreach (Transition transition in transitions)
-            {
-                RemoveUnitFromTransition(transition.previousOrder, transition.nextOrder, unit);
-            }
+            
+            return transitions.Count > 0;
         }
 
         public Order LastOrderForUnit(Unit unit)
@@ -142,25 +150,24 @@ namespace Systems.Orders
             return currentOrder;
         }
 
-        private void GetNextTransition(Unit unit, out Transition transition, Order order = null)
+        public bool TryGetTransition(Unit unit, out Transition transition, Order fromOrder)
         {
-            if (unit.activeOrder != null)
+            if (orderTransitionsTable.TryGetValue(fromOrder, out List<Transition> transitions))
             {
-                order = order == null ? unit.activeOrder : order;
-                
-                transition = orderTransitionsTable[order].FirstOrDefault(orderTransition =>
-                    orderTransition.previousOrder == unit.activeOrder &&
+                transition = transitions.FirstOrDefault(orderTransition =>
+                    orderTransition.previousOrder == fromOrder &&
                     orderTransition.assignedUnits.Contains(unit));
                 
-                return;
+                return transition != null;
             }
 
             transition = null;
+            return false;
         }
 
         public void TransitionUnitToNextOrder(Unit unit)
         {
-            GetNextTransition(unit, out Transition transition);
+            TryGetTransition(unit, out Transition transition, unit.activeOrder);
             unit.UnAssignActiveOrder();
             
             if (transition != null)

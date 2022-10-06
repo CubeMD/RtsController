@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Systems.Orders;
+using Unity.Mathematics;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
@@ -272,32 +273,41 @@ public class RtsAgent : Agent
         if (Physics.Raycast(ray, out RaycastHit hitInfo, 50f, interactableLayerMask))
         {
             bool additive = secondaryAction == ShiftActionType.Shift;
+            OrderData orderData;
             
             if (hitInfo.collider.TryGetComponent(out Reclaim reclaim))
             {
-                CreateOrderAndAssign(new ReclaimOrderData(reclaim), selectedUnits, additive, reclaim.transform);
+                orderData = new OrderData(reclaim.transform, OrderType.Reclaim);
+                
             }
             else if (hitInfo.collider.TryGetComponent(out Unit unit) && !environment.UnitBelongsToAgent(unit, this))
             {
-                CreateOrderAndAssign(new AttackOrderData(unit), selectedUnits, additive, unit.transform);
+                orderData = new OrderData(unit.transform, OrderType.Attack);
             }
             else
             {
-                CreateOrderAndAssign(new MoveOrderData(hitInfo.point), selectedUnits, additive, transform.parent, hitInfo.point - transform.parent.position);
+                orderData = new PositionOrderData(hitInfo.point, hitInfo.transform, OrderType.Move);
             }
+            
+            CreateOrderAndAssign(orderData, selectedUnits, additive, hitInfo.point);
         }
         
         //Debug.Log($"Agent action is: {continuousAction}, {discreteActions[0]}");
     }
 
-    public void CreateOrderAndAssign(OrderData orderData, List<Unit> assignedUnits, bool additive, Transform parent, Vector3 localPosition = new Vector3())
+    public void CreateOrderAndAssign(OrderData orderData, List<Unit> assignedUnits, bool additive, Vector3 position)
     {
         List<Unit> capableUnits = assignedUnits.Where(unit => unit.CanExecuteOrderType(orderData.orderType)).ToList();
 
         if (capableUnits.Count > 0)
         {
-            Order order = CreateOrder(orderData, parent, localPosition);
-        
+            Order order = Instantiate(orderPrefab, position, Quaternion.identity, transform.parent);
+
+            order.OrderData = orderData;
+            order.owner = this;
+            
+            OrderGraph.AddOrder(order);
+
             foreach (Unit unit in capableUnits)
             {
                 if (!additive)
@@ -317,26 +327,7 @@ public class RtsAgent : Agent
             }
         }
     }
-    
-    public Order CreateOrder(OrderData orderData, Transform parent = null, Vector3 localPosition = new Vector3())
-    {
-        Order order;
-        
-        if (parent == null)
-        {
-            order = Instantiate(orderPrefab, localPosition, Quaternion.identity);
-        }
-        else
-        {
-            order = Instantiate(orderPrefab, parent.position + localPosition, Quaternion.identity, parent);
-        }
-        
-        order.OrderData = orderData;
-        order.owner = this;
-        OrderGraph.AddOrder(order);
-        return order;
-    }
-    
+
     public void OrderComplete()
     {
         AddReward(0.01f);
