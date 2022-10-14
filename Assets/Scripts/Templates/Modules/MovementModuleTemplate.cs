@@ -10,7 +10,7 @@ namespace Templates.Modules
 
         public override Module GetModule(Unit unit)
         {
-            return new MovementModule(this, unit);
+            return new MovementOrderExecutionModule(this, unit);
         }
     }
 }

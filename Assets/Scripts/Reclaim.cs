@@ -1,15 +1,18 @@
 using System;
+using Systems.Interfaces;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-public class Reclaim : MonoBehaviour
+public class Reclaim : MonoBehaviour, IDestroyable
 {
-    public event Action<Reclaim> OnReclaimDestroyed;
+    public event Action<IDestroyable> OnDestroyableDestroy;
     
     [SerializeField] private Renderer ren;
     [SerializeField] private Vector2 reclaimMinMax;
     [SerializeField] private Gradient gradient;
     [SerializeField] private float amount = 1;
+
+    private Environment environment;
     
     public float Amount
     {
@@ -18,7 +21,7 @@ public class Reclaim : MonoBehaviour
         {
             if (value <= 0)
             {
-                SelfDestroy();
+                Destroy(gameObject);
                 return;
             }
             
@@ -29,7 +32,13 @@ public class Reclaim : MonoBehaviour
     
     private void OnDestroy()
     {
-        OnReclaimDestroyed?.Invoke(this);
+        OnDestroyableDestroy?.Invoke(this);
+    }
+
+    public void SetEnvironmentOnDestroy(Environment environment)
+    {
+        environment.OnEnvironmentReset += HandleEnvironmentReset;
+        this.environment = environment;
     }
     
     public void SetRandomGaussianAmount(Vector2 rMinMax)
@@ -55,14 +64,20 @@ public class Reclaim : MonoBehaviour
         float sigma = (rMinMax.y - mean) / 3.0f;
         Amount = Mathf.Clamp(std * sigma + mean, rMinMax.x, rMinMax.y);
     }
+
+    public void HandleEnvironmentReset()
+    {
+        Destroy(gameObject);
+        environment.OnEnvironmentReset -= HandleEnvironmentReset;
+    }
     
     private void SetReclaimMinMax(Vector2 rMinMax)
     {
         reclaimMinMax = rMinMax;
     }
-
-    private void SelfDestroy()
+    
+    public GameObject GetGameObject()
     {
-        Destroy(gameObject);
+        return gameObject;
     }
 }

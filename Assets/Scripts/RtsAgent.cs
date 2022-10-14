@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Systems.Orders;
+using Templates;
 using Unity.Mathematics;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
@@ -10,180 +11,205 @@ using Random = UnityEngine.Random;
 
 public class RtsAgent : Agent
 {
-    [SerializeField] private BufferSensorComponent bufferSensorComponent;
-    [SerializeField] private Environment environment;
-    [SerializeField] private Order orderPrefab;
-    
-    [SerializeField] private Transform cameraGizmo;
-    [SerializeField] private Transform selectionGizmo;
-    
-    [SerializeField] private float zoomSpeed;
-    [SerializeField] private Vector2 zoomMinMax;
-    
-    [SerializeField] private bool writeHeuristic;
-
-    [SerializeField] private LayerMask interactableLayerMask;
-
-    public OrderGraph OrderGraph { get; private set; } = new OrderGraph();
-
-    private Camera cam;
-    private float currentZoom;
-    private readonly List<Unit> selectedUnits = new List<Unit>();
-    private float heuristicScrollDelta;
-    private Vector2 heuristicCursorPosActionDelta;
-
     private enum ActionType
     {
-        None = -1,
-        Move = 0,
-        Zoom = 1,
-        LeftDrag = 2,
-        RightClick = 3
+        None = 0,
+        MoveCursor = 1,
+        MoveCamera = 2,
+        Zoom = 3,
+        LeftDrag = 4,
+        RightClick = 5
     }
 
-    private enum ShiftActionType
-    {
-        NoShift = 0,
-        Shift = 1
-    }
+    [Header("Objects")]
+    [SerializeField] private BufferSensorComponent reclaimSensorComponent;
+    [SerializeField] private BufferSensorComponent unitSensorComponent;
+    [SerializeField] private BufferSensorComponent orderSensorComponent;
+    [SerializeField] private BufferSensorComponent linkSensorComponent;
+    [SerializeField] private Environment environment;
+    [SerializeField] public OrderManager orderManager;
+    [SerializeField] private Camera cam;
+    [SerializeField] private Transform cameraTransform;
+    [SerializeField] private Transform cameraGizmoTransform;
+    [SerializeField] private Transform cursorTransform;
+    [SerializeField] private Transform selectionBoxTransform;
     
-    private ActionType currentAction = ActionType.None;
-    private ShiftActionType currentShiftAction = ShiftActionType.NoShift;
+    [Header("Unit")]
+    [SerializeField] private Unit unitPrefab;
+    [SerializeField] private UnitTemplate startingUnitTemplate;
+    [SerializeField] private int numStartingUnits = 1;
+    
+    [Header("Parameters")]
+    [SerializeField] private float zoomSpeed;
+    [SerializeField] private Vector2 zoomMinMax;
+    [SerializeField] private bool writeHeuristic;
+    [SerializeField] private LayerMask interactableLayerMask;
 
-    public override void Initialize()
+    public readonly List<Unit> ownedUnits = new List<Unit>();
+    public readonly List<Unit> selectedUnits = new List<Unit>();
+    
+    private Vector2 cursorAction;
+    private ActionType actionType = ActionType.None;
+    private bool shiftAction;
+
+    private float CameraZoom
     {
-        cam = Camera.main;
+        get => cam.orthographicSize;
+        set
+        {
+            cam.orthographicSize = value;
+            Vector3 gizmoScale = Vector3.one * value * 2;
+            gizmoScale.y = 1;
+            cameraGizmoTransform.localScale = gizmoScale;
+        }
     }
 
+    private float MapSize => environment.halfGroundSize;
+
+    
     public override void OnEpisodeBegin()
     {
-        currentZoom = Random.Range(zoomMinMax.x, zoomMinMax.y);
-        cameraGizmo.localScale = new Vector3(currentZoom * 2, 1, currentZoom * 2);
-        transform.localPosition = Vector3.zero;
-        selectionGizmo.localScale = Vector3.zero;
-        selectionGizmo.localPosition = Vector3.zero;
-        OrderGraph = new OrderGraph();
+        CameraZoom = Random.Range(zoomMinMax.x, zoomMinMax.y);
+        cameraTransform.localPosition = Vector3.zero;
+        cursorTransform.localPosition = Vector3.zero;
+        selectionBoxTransform.localScale = Vector3.zero;
+        selectionBoxTransform.localPosition = Vector3.zero;
         
-        environment.Reset();
+        ownedUnits.Clear();
         selectedUnits.Clear();
         
-        currentAction = ActionType.None;
-        currentShiftAction = ShiftActionType.NoShift;
-        heuristicScrollDelta = 0;
-        heuristicCursorPosActionDelta = Vector2.zero;
-    }
+        cursorAction = Vector2.zero;
+        actionType = ActionType.None;
+        shiftAction = false;
 
+        SpawnStartingUnits();
+    }
+    
+    private void SpawnStartingUnits()
+    {
+        for (int i = 0; i < numStartingUnits; i++)
+        {
+            Vector3 localPosition = new Vector3(
+                Random.Range(-MapSize, MapSize), 
+                0, 
+                Random.Range(-MapSize, MapSize));
+            
+            Unit unit = Instantiate(unitPrefab, transform.parent.localPosition + localPosition, Quaternion.identity, transform.parent);
+            unit.SetUnitTemplate(startingUnitTemplate, this, environment);
+        }
+    }
+    
     public override void CollectObservations(VectorSensor sensor)
     {
-        sensor.AddObservation((float)StepCount / MaxStep);
-        
-        sensor.AddObservation(transform.localPosition.x / environment.halfGroundSize);
-        sensor.AddObservation(transform.localPosition.z / environment.halfGroundSize);
+        sensor.AddObservation(cameraTransform.localPosition.x / MapSize);
+        sensor.AddObservation(cameraTransform.localPosition.z / MapSize);
 
-        float zoomObservation = Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, currentZoom) * 2 - 1;
+        float zoomObservation = Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom) * 2 - 1;
         sensor.AddObservation(zoomObservation);
 
         bool debugged = false;
         
-        int i = 0;
-        foreach (Collider collider in Physics.OverlapBox(cameraGizmo.position, cameraGizmo.localScale / 2, Quaternion.identity, interactableLayerMask))
+        foreach (Collider collider in Physics.OverlapBox(cam.transform.position, cam.transform.localScale / 2, Quaternion.identity, interactableLayerMask))
         {
-            float[] obs = {};
+            List<float> interactableObservation = new List<float>
+            {
+                (collider.transform.localPosition.x - cameraTransform.localPosition.x) / CameraZoom, 
+                (collider.transform.localPosition.z - cameraTransform.localPosition.z) / CameraZoom,
+            };
+
             
-            if (collider.TryGetComponent(out Reclaim reclaim))
-            {
-                obs = new []
-                {
-                    (collider.transform.localPosition.x - transform.localPosition.x) / currentZoom, 
-                    (collider.transform.localPosition.z - transform.localPosition.z) / currentZoom,
-                    reclaim.Amount,
-                    1,
-                    i++
-                };
-            }
-            else if (collider.TryGetComponent(out Unit unit))
-            {
-                bool own = environment.UnitBelongsToAgent(unit, this);
-                
-                 obs = new []
-                {
-                    (collider.transform.localPosition.x - transform.localPosition.x) / currentZoom, 
-                    (collider.transform.localPosition.z - transform.localPosition.z) / currentZoom,
-                    own ? 1 : 0,
-                    0,
-                    i++
-                };
-            }
-            else if (collider.TryGetComponent(out Order order))
-            {
-                bool own = environment.UnitBelongsToAgent(unit, this);
-                
-                obs = new []
-                {
-                    (collider.transform.localPosition.x - transform.localPosition.x) / currentZoom, 
-                    (collider.transform.localPosition.z - transform.localPosition.z) / currentZoom,
-                    own ? 1 : 0,
-                    0,
-                    i++
-                };
-            }
+            // if (collider.TryGetComponent(out Reclaim reclaim))
+            // {
+            //     interactableObservation.Add(reclaim.Amount);
+            //     reclaimSensorComponent.AppendObservation(interactableObservation.ToArray());
+            // }
+            // else if (collider.TryGetComponent(out Unit unit))
+            // {
+            //     interactableObservation.Add(ownedUnits.Contains(unit) ? 1 : 0);
+            //     unitSensorComponent.AppendObservation(interactableObservation.ToArray());
+            // }
+            // else if (collider.TryGetComponent(out Order order))
+            // {
+            //     interactableObservation.Add((int)order.OrderData.orderType);
+            //     orderSensorComponent.AppendObservation(interactableObservation.ToArray());
+            // }
 
                 
-            if (!debugged)
-            {
-                //Debug.Log($"Obs: target: {obs[0]}, {obs[1]}, cam zoom: {zoomObservation}");
-                debugged = true;
-            }
-                
-            //bufferSensorComponent.AppendObservation(obs);
+            // if (!debugged)
+            // {
+            //     //Debug.Log($"Obs: target: {obs[0]}, {obs[1]}, cam zoom: {zoomObservation}");
+            //     debugged = true;
+            // }
         }
+
+        
+        // TODO: Figure out this monstrosity
+        
+        foreach (Unit ownedUnit in ownedUnits)
+        {
+            //transitionSensorComponent.AppendObservation();
+        }
+        
+        // foreach (Transition transition in orderManager.GetTransitions())
+        // {
+        //     foreach (Unit transitionAssignedUnit in transition.assignedUnits)
+        //     {
+        //         List<float> transitionObservation = new List<float>();
+        //         //transitionObservation.Add();
+        //         //transitionSensorComponent.AppendObservation();
+        //     }
+        // }
     }
 
     private void Update()
     {
-        if (writeHeuristic)
+        if (!writeHeuristic) return;
+        
+        if (Input.mouseScrollDelta.y != 0 || actionType == ActionType.Zoom)
         {
-            if (Input.mouseScrollDelta.y != 0 || currentAction == ActionType.Zoom)
-            {
-                heuristicScrollDelta = Mathf.Clamp(heuristicScrollDelta - Input.mouseScrollDelta.y / 3f, -1f, 1f);
-                currentAction = ActionType.Zoom;
-                return;
-            }
-            
-            if (currentAction == ActionType.None)
-            {
-                if (Input.GetKeyDown(KeyCode.Mouse0))
-                {
-                    currentAction = ActionType.LeftDrag;
-                }
-                else if (Input.GetKeyDown(KeyCode.Mouse1))
-                {
-                    currentAction = ActionType.RightClick;
-                }
-                else if (Input.GetKeyDown(KeyCode.Space))
-                {
-                    currentAction = ActionType.Move;
-                }
-                else
-                {
-                    return;
-                }
-
-                if (Input.GetKey(KeyCode.LeftShift))
-                {
-                    currentShiftAction = ShiftActionType.Shift;
-                }
-                
-                Vector3 cursorWorldPos = cam.ScreenToWorldPoint(new Vector3(
-                    Mathf.Clamp(Input.mousePosition.x, 0, 1000), 
-                    Mathf.Clamp(Input.mousePosition.y, 0, 1000),
-                    25));
-
-                heuristicCursorPosActionDelta = new Vector2(
-                    Mathf.Clamp((cursorWorldPos.x - transform.position.x) / currentZoom, -1f, 1),
-                    Mathf.Clamp((cursorWorldPos.z - transform.position.z) / currentZoom, -1f, 1));
-            }
+            cursorAction = new Vector2(0, Mathf.Clamp(cursorAction.y - Input.mouseScrollDelta.y / 3f, -1f, 1f));
+            actionType = ActionType.Zoom;
+            return;
         }
+
+        if (actionType != ActionType.None) return;
+        
+        if (Input.GetKeyDown(KeyCode.Mouse0))
+        {
+            actionType = ActionType.LeftDrag;
+        }
+        else if (Input.GetKeyDown(KeyCode.Mouse1))
+        {
+            actionType = ActionType.RightClick;
+        }
+        else if (Input.GetKeyDown(KeyCode.Space))
+        {
+            actionType = ActionType.MoveCursor;
+        }
+        else if (Input.GetKeyDown(KeyCode.Mouse2))
+        {
+            actionType = ActionType.MoveCamera;
+        }
+        else
+        {
+            return;
+        }
+
+        if (Input.GetKey(KeyCode.LeftShift))
+        {
+            shiftAction = true;
+        }
+                
+        Vector3 cursorLocalPos = cursorTransform.transform.InverseTransformPoint(cam.ScreenToWorldPoint(new Vector3(
+            Mathf.Clamp(Input.mousePosition.x, 0, 1000), 
+            Mathf.Clamp(Input.mousePosition.y, 0, 1000),
+            25)));
+        
+        cursorAction = new Vector2(
+            Mathf.Clamp(cursorLocalPos.x / CameraZoom / 2, -1f, 1),
+            Mathf.Clamp(cursorLocalPos.z / CameraZoom / 2, -1f, 1));
+        
+        //Debug.Log($"Heuristic action: {cursorLocalPos.x / CameraZoom / 2}, {cursorAction}, {actionType}, {shiftAction}");
     }
     
     public override void Heuristic(in ActionBuffers actionsOut)
@@ -191,32 +217,21 @@ public class RtsAgent : Agent
         ActionSegment<float> continuousActions = actionsOut.ContinuousActions;
         ActionSegment<int> discreteActions = actionsOut.DiscreteActions;
         
-        discreteActions[0] = currentAction == ActionType.None ? (int)ActionType.Move : (int)currentAction;
-        discreteActions[1] = (int)currentShiftAction;
+        discreteActions[0] = actionType == ActionType.None ? (int)ActionType.MoveCursor : (int)actionType;
+        discreteActions[1] = shiftAction ? 1 : 0;
         
-        if (currentAction == ActionType.Zoom)
-        {
-            continuousActions[0] = 0;
-            continuousActions[1] = heuristicScrollDelta;
-        }
-        else
-        {
-            continuousActions[0] = heuristicCursorPosActionDelta.x;
-            continuousActions[1] = heuristicCursorPosActionDelta.y;
-        }
+        continuousActions[0] = cursorAction.x;
+        continuousActions[1] = cursorAction.y;
         
-        heuristicScrollDelta = 0;
-        heuristicCursorPosActionDelta = Vector2.zero;
-        currentAction = ActionType.None;
-        currentShiftAction = ShiftActionType.NoShift;
-
-        //Debug.Log($"Heuristic action: {continuousActions[0]}, {continuousActions[1]}, {discreteActions[0]}");
+        cursorAction = Vector2.zero;
+        actionType = ActionType.None;
+        shiftAction = false;
     }
     
     public override void OnActionReceived(ActionBuffers actions)
     {
-        selectionGizmo.localScale = Vector3.zero;
-        selectionGizmo.localPosition = Vector3.zero;
+        selectionBoxTransform.localScale = Vector3.zero;
+        selectionBoxTransform.localPosition = Vector3.zero;
 
         ActionSegment<float> continuousActions = actions.ContinuousActions;
         ActionSegment<int> discreteActions = actions.DiscreteActions;
@@ -225,116 +240,102 @@ public class RtsAgent : Agent
             Mathf.Clamp(continuousActions[0], -1f, 1f),
             Mathf.Clamp(continuousActions[1], -1f, 1f));
 
-        ActionType primaryAction = (ActionType)discreteActions[0];
-        ShiftActionType secondaryAction = (ShiftActionType)discreteActions[1];
+        ActionType currentActionType = (ActionType)discreteActions[0];
+        bool currentShiftAction = discreteActions[1] == 1;
         
-        AddReward(-0.01f - 0.1f * continuousAction.y * continuousAction.y);
+        AddReward(-0.01f);
+        AddReward(-0.1f * continuousAction.y * continuousAction.y);
         
-        if (primaryAction == ActionType.Zoom)
+        if (currentActionType == ActionType.Zoom)
         {
-            currentZoom = Mathf.Clamp(currentZoom + continuousAction.y * zoomSpeed, zoomMinMax.x, zoomMinMax.y);
-            float doubleZoom = currentZoom * 2;
-            cameraGizmo.localScale = new Vector3(doubleZoom, 1, doubleZoom);
+            float clampedDeltaZoom = Mathf.Clamp(continuousAction.y * zoomSpeed, zoomMinMax.x - CameraZoom, zoomMinMax.y - CameraZoom);
+            
+            if (clampedDeltaZoom < 0)
+            {
+                cameraTransform.localPosition += cursorTransform.localPosition * (1 - Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom + clampedDeltaZoom)) * 0.4f;
+            }
+            
+            cursorTransform.localPosition *= (CameraZoom + clampedDeltaZoom) / CameraZoom;
+            CameraZoom += clampedDeltaZoom;
+            
+            Vector3 mapSizeCorrectedCameraPosition = new Vector3(
+                Mathf.Clamp(cameraTransform.localPosition.x, -MapSize + CameraZoom, MapSize - CameraZoom),
+                0f,
+                Mathf.Clamp(cameraTransform.localPosition.z, -MapSize + CameraZoom, MapSize - CameraZoom));
+
+            cameraTransform.localPosition = mapSizeCorrectedCameraPosition;
+            
             return;
         }
 
         AddReward(-0.1f * continuousAction.x * continuousAction.x);
 
-        Vector3 restrictedOffset = new Vector3(
-            Mathf.Clamp(currentZoom * continuousAction.x, -environment.halfGroundSize - transform.localPosition.x, environment.halfGroundSize - transform.localPosition.x),
-            0f,
-            Mathf.Clamp(currentZoom * continuousAction.y, -environment.halfGroundSize - transform.localPosition.z, environment.halfGroundSize - transform.localPosition.z));
-        
-        if (primaryAction == ActionType.LeftDrag)
+        if (currentActionType == ActionType.MoveCamera)
         {
-            selectionGizmo.localScale = new Vector3(Mathf.Abs(restrictedOffset.x), 1, Mathf.Abs(restrictedOffset.z));
-            selectionGizmo.position = transform.position - restrictedOffset / 2;
+            Vector3 desiredCameraLocalPosition = cameraTransform.localPosition + new Vector3(
+                CameraZoom * 2 * continuousAction.x,
+                0f,
+                CameraZoom * 2 * continuousAction.y);
             
-            if (secondaryAction == ShiftActionType.NoShift)
+            cameraTransform.localPosition = new Vector3(
+                Mathf.Clamp(desiredCameraLocalPosition.x, -MapSize + CameraZoom, MapSize - CameraZoom),
+                0f,
+                Mathf.Clamp(desiredCameraLocalPosition.z, -MapSize + CameraZoom, MapSize - CameraZoom));
+            
+            return;
+        }
+        
+        Vector3 clampedCursorLocalPosition = new Vector3(
+            Mathf.Clamp(cursorTransform.localPosition.x + CameraZoom * 2 * continuousAction.x, -CameraZoom, CameraZoom),
+            0f,
+            Mathf.Clamp(cursorTransform.localPosition.z + CameraZoom * 2 * continuousAction.y, -CameraZoom, CameraZoom));
+        
+        if (currentActionType == ActionType.LeftDrag)
+        {
+            Vector3 cursorOffset = clampedCursorLocalPosition - cursorTransform.localPosition;
+            
+            selectionBoxTransform.localScale = new Vector3(Mathf.Abs(cursorOffset.x), 1, Mathf.Abs(cursorOffset.z));
+            selectionBoxTransform.localPosition = cursorTransform.localPosition + cursorOffset / 2;
+            
+            if (!currentShiftAction)
             {
                 selectedUnits.Clear();
             }
             
-            foreach (Collider col in Physics.OverlapBox(transform.position + restrictedOffset / 2, selectionGizmo.localScale / 2, Quaternion.identity, interactableLayerMask))  
+            foreach (Collider col in Physics.OverlapBox(selectionBoxTransform.position, 
+                         selectionBoxTransform.localScale / 2, 
+                         Quaternion.identity, 
+                         interactableLayerMask))  
             {
-                if (col.TryGetComponent(out Unit unit) && environment.UnitBelongsToAgent(unit, this) && !selectedUnits.Contains(unit))
+                if (col.TryGetComponent(out Unit unit) && ownedUnits.Contains(unit) && !selectedUnits.Contains(unit))
                 {
                     selectedUnits.Add(unit);
                 }
             }
         }
 
-        transform.localPosition += restrictedOffset;
+        cursorTransform.localPosition = clampedCursorLocalPosition;
 
-        if (primaryAction != ActionType.RightClick) return;
+        if (currentActionType != ActionType.RightClick) return;
         
-        Ray ray = new Ray(transform.position + Vector3.up * 25f, Vector3.down);
+        Ray ray = new Ray(cursorTransform.position + Vector3.up * 25f, Vector3.down);
 
         if (Physics.Raycast(ray, out RaycastHit hitInfo, 50f, interactableLayerMask))
         {
-            bool additive = secondaryAction == ShiftActionType.Shift;
-            OrderData orderData;
-            
-            if (hitInfo.collider.TryGetComponent(out Reclaim reclaim))
-            {
-                orderData = new OrderData(reclaim.transform, OrderType.Reclaim);
-                
-            }
-            else if (hitInfo.collider.TryGetComponent(out Unit unit) && !environment.UnitBelongsToAgent(unit, this))
-            {
-                orderData = new OrderData(unit.transform, OrderType.Attack);
-            }
-            else
-            {
-                orderData = new PositionOrderData(hitInfo.point, hitInfo.transform, OrderType.Move);
-            }
-            
-            CreateOrderAndAssign(orderData, selectedUnits, additive, hitInfo.point);
+            orderManager.IssueOrderToSelectedUnits(hitInfo, selectedUnits, currentShiftAction);
         }
-        
         //Debug.Log($"Agent action is: {continuousAction}, {discreteActions[0]}");
     }
-
-    public void CreateOrderAndAssign(OrderData orderData, List<Unit> assignedUnits, bool additive, Vector3 position)
-    {
-        List<Unit> capableUnits = assignedUnits.Where(unit => unit.CanExecuteOrderType(orderData.orderType)).ToList();
-
-        if (capableUnits.Count > 0)
-        {
-            Order order = Instantiate(orderPrefab, position, Quaternion.identity, transform.parent);
-
-            order.OrderData = orderData;
-            order.owner = this;
-            
-            OrderGraph.AddOrder(order);
-
-            foreach (Unit unit in capableUnits)
-            {
-                if (!additive)
-                {
-                    OrderGraph.RemoveUnitFromAllTransitions(unit);
-                    unit.UnAssignActiveOrder();
-                }
-            
-                if (unit.activeOrder != null)
-                {
-                    OrderGraph.AddUnitToTransitionOrCreateNew(OrderGraph.LastOrderForUnit(unit), order, unit);
-                }
-                else
-                {
-                    unit.TryAssignActiveOrder(order);
-                }
-            }
-        }
-    }
-
-    public void OrderComplete()
+    
+    public void OrderComplete(OrderData orderData, Unit unit)
     {
         AddReward(0.01f);
+        //Debug.Log("Order completed");
     }
     
     public void UnitCollectedMass(float amount)
     {
         AddReward(amount);
+        //Debug.Log($"Reclaimed {amount} mass");
     }
 }

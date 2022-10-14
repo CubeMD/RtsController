@@ -50,12 +50,9 @@ MonoBehaviour:
   reclaimMinMax: {x: 0, y: 10}
   reclaimPrefab: {fileID: 4320805846232463114, guid: d59ec32ab969a14488fdc4a22182d668, type: 3}
   numGaussianReclaim: 50
-  unitPrefab: {fileID: 5783598507208318217, guid: cd3ee9b1e21424d40aee4acf19d8bc4e, type: 3}
   agents:
   - {fileID: 6073555764631712557}
-  templates:
-  - {fileID: 11400000, guid: 7a81450c883149b4f8194f72f5504815, type: 2}
-  numCommanders: 10
+  timeToReset: 100
 --- !u!1001 &623692831023433168
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -63,10 +60,6 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 7912272080898073893}
     m_Modifications:
-    - target: {fileID: 2175531939623175081, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
-      propertyPath: decisionPeriod
-      value: 25
-      objectReference: {fileID: 0}
     - target: {fileID: 4799327343366791544, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
       propertyPath: m_Name
       value: ClickerAgent

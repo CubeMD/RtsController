@@ -144,7 +144,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!20 &498023493
 Camera:
   m_ObjectHideFlags: 0
@@ -355,10 +355,6 @@ PrefabInstance:
     - target: {fileID: 1689441413796829984, guid: f4880b3a33375fa4f8660f93622fbda5, type: 3}
       propertyPath: numCommanders
       value: 10
-      objectReference: {fileID: 0}
-    - target: {fileID: 6073555764631712557, guid: f4880b3a33375fa4f8660f93622fbda5, type: 3}
-      propertyPath: MaxStep
-      value: 2500
       objectReference: {fileID: 0}
     - target: {fileID: 6723100960524146448, guid: f4880b3a33375fa4f8660f93622fbda5, type: 3}
       propertyPath: m_Name

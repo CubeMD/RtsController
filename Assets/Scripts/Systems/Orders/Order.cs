@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Systems.Interfaces;
 using UnityEngine;
 
 namespace Systems.Orders
@@ -16,43 +17,51 @@ namespace Systems.Orders
     
     public class OrderData
     {
+        public Order order;
         public Transform targetTransform;
         public OrderType orderType;
+        public bool groundOrder;
+        public Vector3 position;
+        public RtsAgent owner;
         
-        public OrderData(Transform targetTransform, OrderType orderType)
+        public OrderData(Order order, Transform targetTransform, OrderType orderType, bool groundOrder, Vector3 position, RtsAgent owner)
         {
+            this.order = order;
             this.targetTransform = targetTransform;
             this.orderType = orderType;
+            this.groundOrder = groundOrder;
+            this.position = position;
+            this.owner = owner;
+
+            if (!groundOrder)
+            {
+                targetTransform.GetComponent<IDestroyable>().OnDestroyableDestroy += HandleOrderDestroyed;
+            }
+            order.GetComponent<IDestroyable>().OnDestroyableDestroy += HandleOrderDestroyed;
         }
         
-        public virtual Vector3 GetOrderPosition()
+        public Vector3 GetOrderPosition()
         {
-            return targetTransform.position;
+            return groundOrder ? position : targetTransform.position;
+        }
+
+        public void HandleOrderDestroyed(IDestroyable destroyable)
+        {
+            if (!groundOrder)
+            {
+                targetTransform.GetComponent<IDestroyable>().OnDestroyableDestroy -= HandleOrderDestroyed;
+            }
+
+            order.GetComponent<IDestroyable>().OnDestroyableDestroy -= HandleOrderDestroyed;
+            owner.orderManager.DestroyOrder(this);
         }
     }
 
-    public class PositionOrderData : OrderData
+    public class Order : MonoBehaviour, IDestroyable
     {
-        public Vector3 targetPosition;
-
-        public PositionOrderData(Vector3 targetPosition, Transform targetTransform, OrderType orderType) : base(targetTransform, orderType)
-        {
-            this.targetPosition = targetPosition;
-        }
+        public event Action<IDestroyable> OnDestroyableDestroy;
         
-        public override Vector3 GetOrderPosition()
-        {
-            return targetPosition;
-        }
-    }
-    
-    public class Order : MonoBehaviour
-    {
         [SerializeField] private Renderer ren;
-
-        public List<Unit> assignedUnits = new List<Unit>();
-
-        public RtsAgent owner;
 
         private OrderData orderData;
         public OrderData OrderData
@@ -77,53 +86,23 @@ namespace Systems.Orders
                 }
             }
         }
-
+        
+        private void OnDestroy()
+        {
+            OnDestroyableDestroy?.Invoke(this);
+        }
+        
         private void Update()
         {
             if (orderData.targetTransform != null)
             {
                 transform.position = orderData.GetOrderPosition();
             }
-            else
-            {
-                SelfDestroy();
-            }
-        }
-
-        public void OnDestroy()
-        {
-            owner.OrderGraph.RemoveOrder(this);
-        }
-
-        public void AssignUnit(Unit unit)
-        {
-            assignedUnits.Add(unit);
-        }
-
-        public void UnAssignUnit(Unit unit)
-        {
-            if (assignedUnits.Contains(unit))
-            {
-                assignedUnits.Remove(unit);
-
-                CheckHasAssignedUnits();
-            }
         }
         
-        public bool CheckHasAssignedUnits()
+        public GameObject GetGameObject()
         {
-            if (assignedUnits.Count < 1 && !owner.OrderGraph.HasTransitionsToOrder(this))
-            {
-                SelfDestroy();
-                return false;
-            }
-
-            return true;
-        }
-
-        public void SelfDestroy()
-        {
-            Destroy(gameObject);
+            return gameObject;
         }
     }
 }

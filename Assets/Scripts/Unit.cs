@@ -1,49 +1,55 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Systems.Interfaces;
 using Systems.Modules;
 using Systems.Orders;
 using Templates;
 using Templates.Modules;
 using UnityEngine;
 
-public class Unit : MonoBehaviour
+public class Unit : MonoBehaviour, IDestroyable
 {
-    public event Action<Unit> OnUnitDestroyed;
-    
+    public event Action<IDestroyable> OnDestroyableDestroy;
+
     [SerializeField] private LineRenderer lineRenderer;
 
     public RtsAgent Owner { get; private set; }
     
     private UnitTemplate unitTemplate;
-    private readonly List<Module> unitModules = new List<Module>();
-    private readonly Dictionary<OrderType, List<OrderExecutionModule>> orderExecutionModulesByOrderType 
+    private Environment environment;
+    private OrderData activeOrderData;
+
+    private readonly Dictionary<OrderType, List<OrderExecutionModule>> orderExecutionModulesTable 
         = new Dictionary<OrderType, List<OrderExecutionModule>>();
-    public Order activeOrder;
 
     private void OnDestroy()
     {
-        if (activeOrder != null)
+        OnDestroyableDestroy?.Invoke(this);
+        Owner.orderManager.RemoveUnitFromGraph(this);
+        Owner.ownedUnits.Remove(this);
+
+        if (Owner.selectedUnits.Contains(this))
         {
-            activeOrder.UnAssignUnit(this);
-            //Owner.OrderGraph.RemoveUnitFromAllTransitions(this);
+            Owner.selectedUnits.Remove(this);
         }
-        
-        OnUnitDestroyed?.Invoke(this);
     }
 
-    public void SetUnitTemplate(UnitTemplate template, RtsAgent unitOwner)
+    public void SetUnitTemplate(UnitTemplate template, RtsAgent unitOwner, Environment environment)
     {
         Owner = unitOwner;
         unitTemplate = template;
+        this.environment = environment;
+        environment.OnEnvironmentReset += HandleEnvironmentReset;
+        Owner.orderManager.AddUnitToGraph(this);
+        Owner.ownedUnits.Add(this);
         
         foreach (ModuleTemplate moduleTemplate in unitTemplate.moduleTemplates)
         {
             if (moduleTemplate != null)
             {
                 Module module = moduleTemplate.GetModule(this);
-                unitModules.Add(module);
-                
+
                 if (module is OrderExecutionModule orderExecutionModule)
                 {
                     IEnumerable<Enum> orderTypes = Enum.GetValues(typeof(OrderType)).Cast<Enum>()
@@ -51,13 +57,13 @@ public class Unit : MonoBehaviour
                     
                     foreach (OrderType orderType in orderTypes)
                     {
-                        if (!orderExecutionModulesByOrderType.ContainsKey(orderType))
+                        if (!orderExecutionModulesTable.ContainsKey(orderType))
                         {
-                            orderExecutionModulesByOrderType.Add(orderType, new List<OrderExecutionModule>{orderExecutionModule});
+                            orderExecutionModulesTable.Add(orderType, new List<OrderExecutionModule>{orderExecutionModule});
                         }
                         else
                         {
-                            orderExecutionModulesByOrderType[orderType].Add(orderExecutionModule);
+                            orderExecutionModulesTable[orderType].Add(orderExecutionModule);
                         }
                     }
                 }
@@ -71,100 +77,106 @@ public class Unit : MonoBehaviour
 
     public void Update()
     {
-        foreach (Module unitModule in unitModules)
+        if (activeOrderData != null)
         {
-            unitModule.Update();
+            orderExecutionModulesTable[activeOrderData.orderType].ForEach(x => x.Update());
+            RenderOrderLines();
         }
+    }
+    
+    public bool CanExecuteOrderType(OrderType orderType)
+    {
+        return orderExecutionModulesTable.ContainsKey(orderType);
+    }
 
-        List<Vector3> points = new List<Vector3> { transform.position + Vector3.up};
-
-        if (activeOrder != null)
+    public void AssignActiveOrder(OrderData orderData)
+    {
+        if (orderData != null)
         {
-            Order currentOrder = activeOrder;
-            points.Add(currentOrder.transform.position);
+            orderExecutionModulesTable.TryGetValue(orderData.orderType,
+                out List<OrderExecutionModule> orderExecutionModules);
             
-            while (true)
+            activeOrderData = orderData;
+    
+            foreach (OrderExecutionModule orderExecutionModule in orderExecutionModules)
             {
-                if (Owner.OrderGraph.TryGetTransition(this, out Transition transition, currentOrder))
-                {
-                    currentOrder = transition.nextOrder;
-                    points.Add(currentOrder.transform.position + Vector3.up);
-                }
-                else
-                {
-                    break;
-                }
-            } 
+                orderExecutionModule.SetActiveOrder(activeOrderData);
+                SubscribeToOrderExecutionModule(orderExecutionModule);
+            }
         }
+    }
+    
+    public void UnAssignActiveOrder()
+    {
+        if (activeOrderData != null && 
+            orderExecutionModulesTable.TryGetValue(activeOrderData.orderType, out List<OrderExecutionModule> orderExecutionModules))
+        {
+            foreach (OrderExecutionModule orderExecutionModule in orderExecutionModules)
+            {
+                orderExecutionModule.ClearActiveOrder();
+            }
+            
+            activeOrderData = null;
+        }
+    }
 
+    public void SubscribeToOrderExecutionModule(OrderExecutionModule module)
+    {
+        module.OnOrderCompleted += HandleOrderCompleted;
+        module.OnOrderDestroyed += HandleOrderDestroyed;
+    }
+
+    private void HandleOrderDestroyed(OrderExecutionModule module, OrderData orderData)
+    {
+        TerminateOrder(module, orderData);
+    }
+
+    public void HandleOrderCompleted(OrderExecutionModule module, OrderData orderData)
+    {
+        TerminateOrder(module, orderData);
+    }
+
+    private void TerminateOrder(OrderExecutionModule module, OrderData previousOrderData)
+    {
+        module.OnOrderCompleted -= HandleOrderCompleted;
+        module.OnOrderDestroyed -= HandleOrderDestroyed;
+        
+        Owner.OrderComplete(previousOrderData, this);
+        UnAssignActiveOrder();
+        if (Owner.orderManager.TryTransitionUnitToNextOrder(this, out OrderData orderData))
+        {
+            AssignActiveOrder(orderData);
+        }
+    }
+
+    public void HandleEnvironmentReset()
+    {
+        Destroy(gameObject);
+        environment.OnEnvironmentReset -= HandleEnvironmentReset;
+    }
+    
+    public GameObject GetGameObject()
+    {
+        return gameObject;
+    }
+    
+    public void UnitCollectedMass(float amount)
+    {
+        Owner.UnitCollectedMass(amount);
+    }
+
+    private void RenderOrderLines()
+    {
+        List<Vector3> points = new List<Vector3>{transform.position + Vector3.up};
+
+        if (activeOrderData != null)
+        {
+            points.Add(activeOrderData.position + Vector3.up);
+        }
+        
+        Owner.orderManager.GetTransitionsForUnit(this).ForEach(x => points.Add(x.position + Vector3.up));
+        
         lineRenderer.positionCount = points.Count;
         lineRenderer.SetPositions(points.ToArray());
     }
-    
-    public bool TryAssignActiveOrder(Order order)
-    {
-        if (orderExecutionModulesByOrderType.TryGetValue(order.OrderData.orderType, out List<OrderExecutionModule> orderExecutionModules))
-        {
-            activeOrder = order;
-            
-            activeOrder.AssignUnit(this);
-            
-            foreach (OrderExecutionModule orderExecutionModule in orderExecutionModules)
-            {
-                orderExecutionModule.SetOrder(activeOrder);
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
-    public bool CanExecuteOrderType(OrderType orderType)
-    {
-        return orderExecutionModulesByOrderType.ContainsKey(orderType);
-    }
-
-    public void UnAssignActiveOrder()
-    {
-        if (activeOrder != null && 
-            orderExecutionModulesByOrderType.TryGetValue(activeOrder.OrderData.orderType, out List<OrderExecutionModule> orderExecutionModules))
-        {
-            foreach (OrderExecutionModule orderExecutionModule in orderExecutionModules)
-            {
-                orderExecutionModule.UnSetOrder();
-            }
-
-            activeOrder.UnAssignUnit(this);
-            activeOrder = null;
-        }
-    }
-    
-    public void HandleUnitCompletedOrder()
-    {
-        Owner.OrderComplete();
-        Owner.OrderGraph.TransitionUnitToNextOrder(this);
-    }
-
-
-    // public Order CreateSubOrder(Order parentOrder, OrderData orderData, Vector3 worldPosition)
-    // {
-    //     if (TryGetOrderExecutionModule(orderData.orderType, out OrderExecutionModule orderExecutionModule))
-    //     {
-    //         Order order = Owner.CreateOrder(orderData, Owner.transform.parent, Owner.transform.parent.InverseTransformPoint(worldPosition));
-    //         
-    //         order.AddAssignedUnit(this, true);
-    //         
-    //         ExecutingOrderState executingOrderState = orderExecutionModule.GetState(this, order);
-    //         
-    //         unitStateMachine.AddState(executingOrderState, true);
-    //
-    //         scheduledOrders.Add(order, executingOrderState);
-    //         
-    //         return order;
-    //     }
-    //     
-    //     Debug.LogError("Could not create sub order");
-    //     return null;
-    // }
 }

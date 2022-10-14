@@ -1,26 +1,45 @@
-﻿using Systems.Orders;
+﻿using System;
+using Systems.Interfaces;
+using Systems.Orders;
 
 namespace Systems.Modules
 {
-    public class OrderExecutionModule : Module
+    public abstract class OrderExecutionModule : Module
     {
+        public event Action<OrderExecutionModule, OrderData> OnOrderDestroyed;
+        public event Action<OrderExecutionModule, OrderData> OnOrderCompleted;
+        
         public OrderType orderType;
+        public OrderData orderData;
         
         public OrderExecutionModule(Unit unit) : base(unit) { }
 
-        public virtual void SetOrder(Order order)
+        public virtual void SetActiveOrder(OrderData activeOrderData)
         {
-            active = true;
+            orderData = activeOrderData;
+            activeOrderData.order.OnDestroyableDestroy += HandleOrderDestroyed;
         }
 
-        public virtual void UnSetOrder()
+        public void ClearActiveOrder()
         {
-            active = false;
+            orderData = null;
+        }
+        
+        private void HandleOrderDestroyed(IDestroyable iDestroyable)
+        {
+            ClearActiveOrder();
+            BroadcastOrderDestroyed();
         }
 
-        public virtual void Complete()
+        protected void BroadcastOrderDestroyed()
         {
-            unit.HandleUnitCompletedOrder();
+            OnOrderDestroyed?.Invoke(this, orderData);
+        }
+
+        protected void BroadcastOrderCompleted()
+        {
+            orderData.order.OnDestroyableDestroy -= HandleOrderDestroyed;
+            OnOrderCompleted?.Invoke(this, orderData);
         }
     }
 }

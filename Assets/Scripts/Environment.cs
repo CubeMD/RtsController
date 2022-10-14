@@ -1,12 +1,13 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Templates;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
 public class Environment : MonoBehaviour
 {
-    private const string COMMANDER_TEMPLATE_ID = "Commander";
-    
+    public event Action OnEnvironmentReset; 
+
     [Header("Ground")]
     [HideInInspector] public float halfGroundSize;
     [SerializeField] private Transform ground;
@@ -15,126 +16,54 @@ public class Environment : MonoBehaviour
     [SerializeField] private Vector2 reclaimMinMax;
     [SerializeField] private Reclaim reclaimPrefab;
     [SerializeField] private int numGaussianReclaim;
-
-    [Header("Unit")]
-    [SerializeField] private Unit unitPrefab;
-
-    [SerializeField] private List<RtsAgent> agents;
-    [SerializeField] private List<UnitTemplate> templates;
-    [SerializeField] private int numCommanders = 1;
     
-    private readonly List<Reclaim> reclaims = new List<Reclaim>();
-    private readonly List<Unit> units = new List<Unit>();
-    private readonly Dictionary<RtsAgent, List<Unit>> agentUnits = new Dictionary<RtsAgent, List<Unit>>();
-    private readonly Dictionary<string, UnitTemplate> unitIdTable = new Dictionary<string, UnitTemplate>();
+    [Header("Agents")]
+    [SerializeField] private List<RtsAgent> agents;
+    [SerializeField] private float timeToReset;
+
+    private float timeSinceReset;
     
     private void Awake()
     {
         halfGroundSize = ground.localScale.x / 2;
 
-        foreach (RtsAgent agent in agents)
-        {
-            agentUnits.Add(agent, new List<Unit>());
-        }        
-
-        foreach (UnitTemplate unitTemplate in templates)
-        {
-            unitIdTable.Add(unitTemplate.id, unitTemplate);
-        }
-    }
-
-    public bool UnitBelongsToAgent(Unit unit, RtsAgent agent)
-    {
-        return agentUnits.ContainsKey(agent) && agentUnits[agent].Contains(unit);
-    }
-
-    public void Reset()
-    {
-        ResetReclaim();
-        ResetUnits();
-    }
-
-    private void ResetUnits()
-    {
-        foreach (List<Unit> agentUnit in agentUnits.Values)
-        {
-            foreach (Unit unit in agentUnit)
-            {
-                Destroy(unit.gameObject);
-            }
-        }
-        
         foreach (RtsAgent rtsAgent in agents)
         {
-            for (int i = 0; i < numCommanders; i++)
-            {
-                Vector3 position = new Vector3(
-                    Random.Range(-halfGroundSize, halfGroundSize), 
-                    0, 
-                    Random.Range(-halfGroundSize, halfGroundSize));
-            
-                units.Add(SpawnUnit(rtsAgent, position, unitIdTable[COMMANDER_TEMPLATE_ID]));
-            }
+            OnEnvironmentReset += rtsAgent.EndEpisode;
+        }
+        
+        SpawnStartingReclaim();
+    }
+
+    public void Update()
+    {
+        timeSinceReset += Time.deltaTime;
+        
+        if (timeSinceReset >= timeToReset)
+        {
+            ResetEnvironment();
         }
     }
 
-    private Unit SpawnUnit(RtsAgent owner, Vector3 position, UnitTemplate unitTemplate)
+    public void ResetEnvironment()
     {
-        Unit unit = Instantiate(unitPrefab, position, Quaternion.identity, transform);
-        unit.SetUnitTemplate(unitTemplate, owner);
-        unit.OnUnitDestroyed += HandleUnitDestroyed;
-        agentUnits[owner].Add(unit);
-        return unit;
+        OnEnvironmentReset?.Invoke();
+        timeSinceReset = 0;
+        SpawnStartingReclaim();
     }
 
-    private void HandleUnitDestroyed(Unit unit)
+    public void SpawnStartingReclaim()
     {
-        agentUnits[unit.Owner].Remove(unit);
-        if (units.Remove(unit))
-        {
-            unit.OnUnitDestroyed -= HandleUnitDestroyed;
-        }
-        else
-        {
-            Debug.LogWarning("Received event for destruction of foreign unit", unit);
-        }
-    }
-    
-    private void ResetReclaim()
-    {
-        foreach (Reclaim r in reclaims)
-        {
-            Destroy(r.gameObject);
-        }
-
         for (int i = 0; i < numGaussianReclaim; i++)
         {
-            Vector3 position = new Vector3(
-                Random.Range(-halfGroundSize, halfGroundSize), 
-                0, 
+            Vector3 localPosition = new Vector3(
+                Random.Range(-halfGroundSize, halfGroundSize),
+                0,
                 Random.Range(-halfGroundSize, halfGroundSize));
-            
-            reclaims.Add(SpawnGaussianReclaim(position));
-        }
-    }
-    
-    private Reclaim SpawnGaussianReclaim(Vector3 position)  
-    {
-        Reclaim naturalReclaim = Instantiate(reclaimPrefab, position, Quaternion.identity, transform);
-        naturalReclaim.SetRandomGaussianAmount(reclaimMinMax);
-        naturalReclaim.OnReclaimDestroyed += HandleReclaimDestroyed;
-        return naturalReclaim;
-    }
-    
-    private void HandleReclaimDestroyed(Reclaim reclaim)
-    {
-        if (reclaims.Remove(reclaim))
-        {
-            reclaim.OnReclaimDestroyed -= HandleReclaimDestroyed;
-        }
-        else
-        {
-            Debug.LogWarning("Received event for destruction of foreign reclaim", reclaim);
+
+            Reclaim reclaim = Instantiate(reclaimPrefab, transform.localPosition + localPosition, Quaternion.identity, transform);
+            reclaim.SetEnvironmentOnDestroy(this);
+            reclaim.SetRandomGaussianAmount(reclaimMinMax);
         }
     }
 }
