@@ -7,7 +7,6 @@ namespace Templates
     [CreateAssetMenu(menuName = "Create UnitTemplate", fileName = "UnitTemplate")]
     public class UnitTemplate : ScriptableObject
     {
-        public string id;
-        public List<ModuleTemplate> moduleTemplates;
+        public List<OrderExecutionModuleTemplate> orderExecutionModuleTemplates;
     }
 }

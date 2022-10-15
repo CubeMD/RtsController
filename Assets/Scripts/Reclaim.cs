@@ -33,6 +33,8 @@ public class Reclaim : MonoBehaviour, IDestroyable
     private void OnDestroy()
     {
         OnDestroyableDestroy?.Invoke(this);
+        
+        environment.OnEnvironmentReset -= HandleEnvironmentReset;
     }
 
     public void SetEnvironmentOnDestroy(Environment environment)
@@ -68,7 +70,6 @@ public class Reclaim : MonoBehaviour, IDestroyable
     public void HandleEnvironmentReset()
     {
         Destroy(gameObject);
-        environment.OnEnvironmentReset -= HandleEnvironmentReset;
     }
     
     private void SetReclaimMinMax(Vector2 rMinMax)

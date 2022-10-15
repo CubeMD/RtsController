@@ -6,40 +6,26 @@ namespace Systems.Modules
 {
     public abstract class OrderExecutionModule : Module
     {
-        public event Action<OrderExecutionModule, OrderData> OnOrderDestroyed;
-        public event Action<OrderExecutionModule, OrderData> OnOrderCompleted;
+        public event Action<Unit, Order> OnOrderExecutionModuleCompletedOrder; 
         
         public OrderType orderType;
-        public OrderData orderData;
+        public Order executedOrder;
         
         public OrderExecutionModule(Unit unit) : base(unit) { }
 
-        public virtual void SetActiveOrder(OrderData activeOrderData)
+        public virtual void SetExecutedOrder(Order order)
         {
-            orderData = activeOrderData;
-            activeOrderData.order.OnDestroyableDestroy += HandleOrderDestroyed;
+            executedOrder = order;
         }
 
-        public void ClearActiveOrder()
+        public virtual void ClearActiveOrder()
         {
-            orderData = null;
+            executedOrder = null;
         }
         
-        private void HandleOrderDestroyed(IDestroyable iDestroyable)
+        protected void OrderCompleted()
         {
-            ClearActiveOrder();
-            BroadcastOrderDestroyed();
-        }
-
-        protected void BroadcastOrderDestroyed()
-        {
-            OnOrderDestroyed?.Invoke(this, orderData);
-        }
-
-        protected void BroadcastOrderCompleted()
-        {
-            orderData.order.OnDestroyableDestroy -= HandleOrderDestroyed;
-            OnOrderCompleted?.Invoke(this, orderData);
+            OnOrderExecutionModuleCompletedOrder?.Invoke(unit, executedOrder);
         }
     }
 }

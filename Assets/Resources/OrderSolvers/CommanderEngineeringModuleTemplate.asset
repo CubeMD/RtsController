@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: CommanderEngineeringModuleTemplate
   m_EditorClassIdentifier: 
   orderType: 30
-  defaultReclaimRange: 2.5
-  defaultReclaimPower: 1
+  range: 3
+  power: 1

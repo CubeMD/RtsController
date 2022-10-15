@@ -218,7 +218,6 @@ GameObject:
   - component: {fileID: 7634054201000015619}
   - component: {fileID: 6439419821570432660}
   - component: {fileID: 6696386017978103549}
-  - component: {fileID: 2070575807579086440}
   - component: {fileID: 2175531939623175081}
   - component: {fileID: 1293692952763402599}
   - component: {fileID: 4952269660437515389}
@@ -299,7 +298,7 @@ MonoBehaviour:
   orderSensorComponent: {fileID: 7772815985065370233}
   linkSensorComponent: {fileID: 4973703983311186130}
   environment: {fileID: 0}
-  orderManager: {fileID: 2070575807579086440}
+  orderPrefab: {fileID: 8539681309043346067, guid: ade729e9fe4744c49b0a7131f73507b0, type: 3}
   cam: {fileID: 1184532805882307112}
   cameraTransform: {fileID: 2723807228034373449}
   cameraGizmoTransform: {fileID: 5896268907107454787}
@@ -314,20 +313,6 @@ MonoBehaviour:
   interactableLayerMask:
     serializedVersion: 2
     m_Bits: 64
---- !u!114 &2070575807579086440
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4799327343366791544}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bd8ed8acbab24c568bd23f9a962b8163, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  orderPrefab: {fileID: 8539681309043346067, guid: ade729e9fe4744c49b0a7131f73507b0, type: 3}
-  owner: {fileID: 6696386017978103549}
 --- !u!114 &2175531939623175081
 MonoBehaviour:
   m_ObjectHideFlags: 0

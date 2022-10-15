@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Systems.Interfaces;
 using Systems.Orders;
 using Templates;
 using Unity.Mathematics;
@@ -26,8 +27,8 @@ public class RtsAgent : Agent
     [SerializeField] private BufferSensorComponent unitSensorComponent;
     [SerializeField] private BufferSensorComponent orderSensorComponent;
     [SerializeField] private BufferSensorComponent linkSensorComponent;
-    [SerializeField] private Environment environment;
-    [SerializeField] public OrderManager orderManager;
+    [SerializeField] public Environment environment;
+    [SerializeField] public Order orderPrefab;
     [SerializeField] private Camera cam;
     [SerializeField] private Transform cameraTransform;
     [SerializeField] private Transform cameraGizmoTransform;
@@ -65,7 +66,6 @@ public class RtsAgent : Agent
     }
 
     private float MapSize => environment.halfGroundSize;
-
     
     public override void OnEpisodeBegin()
     {
@@ -93,10 +93,17 @@ public class RtsAgent : Agent
                 Random.Range(-MapSize, MapSize), 
                 0, 
                 Random.Range(-MapSize, MapSize));
-            
-            Unit unit = Instantiate(unitPrefab, transform.parent.localPosition + localPosition, Quaternion.identity, transform.parent);
-            unit.SetUnitTemplate(startingUnitTemplate, this, environment);
+
+            SpawnUnit(startingUnitTemplate, localPosition);
         }
+    }
+
+    public void SpawnUnit(UnitTemplate unitTemplate, Vector3 localPosition)
+    {
+        Unit unit = Instantiate(unitPrefab, transform.parent.localPosition + localPosition, Quaternion.identity, transform.parent);
+        unit.SetUnitTemplate(unitTemplate, this);
+        unit.OnDestroyableDestroy += HandleUnitDestroyed;
+        ownedUnits.Add(unit);
     }
     
     public override void CollectObservations(VectorSensor sensor)
@@ -322,20 +329,57 @@ public class RtsAgent : Agent
 
         if (Physics.Raycast(ray, out RaycastHit hitInfo, 50f, interactableLayerMask))
         {
-            orderManager.IssueOrderToSelectedUnits(hitInfo, selectedUnits, currentShiftAction);
+            
+            CreateAndAssignOrder(hitInfo, selectedUnits, currentShiftAction);
         }
         //Debug.Log($"Agent action is: {continuousAction}, {discreteActions[0]}");
     }
     
-    public void OrderComplete(OrderData orderData, Unit unit)
+    public void CreateAndAssignOrder(RaycastHit hitInfo, List<Unit> assignedUnits, bool additive)
     {
-        AddReward(0.01f);
-        //Debug.Log("Order completed");
+        OrderType orderType;
+        bool groundOrder = false;
+        Vector3 groundHitPosition = hitInfo.point;
+
+        if (hitInfo.collider.TryGetComponent(out Reclaim reclaim))
+        {
+            orderType = OrderType.Reclaim;
+        }
+        else if (hitInfo.collider.TryGetComponent(out Unit unit) && !ownedUnits.Contains(unit))
+        {
+            orderType = OrderType.Attack;
+        }
+        else
+        {
+            orderType = OrderType.Move;
+            groundOrder = true;
+        }
+
+        List<Unit> capableUnits = assignedUnits.Where(unit => unit.CanExecuteOrderType(orderType)).ToList();
+
+        if (capableUnits.Count < 1) return;
+        
+        Order order = Instantiate(orderPrefab, groundHitPosition, Quaternion.identity, transform);
+
+        order.SetOrder(hitInfo.transform, orderType, capableUnits, groundOrder, groundHitPosition, this, additive);
     }
     
     public void UnitCollectedMass(float amount)
     {
         AddReward(amount);
-        //Debug.Log($"Reclaimed {amount} mass");
+    }
+
+    public void HandleUnitDestroyed(IDestroyable destroyable)
+    {
+        Unit unit = destroyable.GetGameObject().GetComponent<Unit>();
+        
+        unit.OnDestroyableDestroy -= HandleUnitDestroyed;
+
+        ownedUnits.Remove(unit);
+
+        if (selectedUnits.Contains(unit))
+        {
+            selectedUnits.Remove(unit);
+        }
     }
 }

@@ -11,35 +11,46 @@ namespace Systems.Modules
         private float reclaimPower;
         private Reclaim targetReclaim;
 
-        public ReclaimOrderExecutionModule(ReclaimModuleTemplate reclaimModuleTemplate, Unit unit) : base(unit)
+        public ReclaimOrderExecutionModule(EngineeringOrderExecutionModuleTemplate engineeringOrderExecutionModuleTemplate, Unit unit) : base(unit)
         {
-            orderType = reclaimModuleTemplate.orderType;
-            reclaimRange = reclaimModuleTemplate.defaultReclaimRange;
-            reclaimPower = reclaimModuleTemplate.defaultReclaimPower;
+            orderType = engineeringOrderExecutionModuleTemplate.orderType;
+            reclaimRange = engineeringOrderExecutionModuleTemplate.range;
+            reclaimPower = engineeringOrderExecutionModuleTemplate.power;
         }
 
-        public override void SetActiveOrder(OrderData activeOrderData)
+        public override void SetExecutedOrder(Order order)
         {
-            base.SetActiveOrder(activeOrderData);
+            base.SetExecutedOrder(order);
             
-            targetReclaim = activeOrderData.targetTransform.GetComponent<Reclaim>();
-            targetReclaim.OnDestroyableDestroy += HandleTargetTargetReclaimDestroyed;
+            targetReclaim = order.targetTransform.GetComponent<Reclaim>();
         }
 
-        private void HandleTargetTargetReclaimDestroyed(IDestroyable obj)
+        public override void ClearActiveOrder()
         {
-            BroadcastOrderCompleted();
+            base.ClearActiveOrder();
+            targetReclaim = null;
         }
-        
+
         public override void Update()
         {
             Vector3 reclaimOffset = targetReclaim.transform.position - unit.transform.position;
 
             if (reclaimOffset.magnitude - reclaimRange <= 0)
             {
-                float amount = Mathf.Min(targetReclaim.Amount - reclaimPower * Time.deltaTime, 0);
-                targetReclaim.Amount -= amount;
-                unit.UnitCollectedMass(amount);
+                float potentialReclaim = reclaimPower * Time.deltaTime;
+
+                float remainingReclaim = targetReclaim.Amount - potentialReclaim;
+                
+                float reclaimAmount = Mathf.Max(targetReclaim.Amount - potentialReclaim, 0);
+                
+                targetReclaim.Amount = remainingReclaim;
+                
+                unit.owner.UnitCollectedMass(reclaimAmount);
+                
+                if (remainingReclaim <= 0)
+                {
+                    OrderCompleted();
+                }
             }
         }
     }

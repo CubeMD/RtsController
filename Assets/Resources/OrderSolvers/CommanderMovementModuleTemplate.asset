@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: CommanderMovementModuleTemplate
   m_EditorClassIdentifier: 
   orderType: -1
-  defaultMovementSpeed: 5
+  speed: 5

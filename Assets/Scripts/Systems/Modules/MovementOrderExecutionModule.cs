@@ -12,18 +12,18 @@ namespace Systems.Modules
         private bool followingTarget;
         private Transform targetTransform;
 
-        public MovementOrderExecutionModule(MovementModuleTemplate movementModuleTemplate, Unit unit) : base(unit)
+        public MovementOrderExecutionModule(MovementOrderExecutionModuleTemplate movementOrderExecutionModuleTemplate, Unit unit) : base(unit)
         {
-            orderType = movementModuleTemplate.orderType;
-            movementSpeed = movementModuleTemplate.defaultMovementSpeed;
-            stoppingDistance = Random.Range(0, 5);
+            orderType = movementOrderExecutionModuleTemplate.orderType;
+            movementSpeed = movementOrderExecutionModuleTemplate.speed;
+            stoppingDistance = Random.Range(0, 2.5f);
         }
 
-        public override void SetActiveOrder(OrderData activeOrderData)
+        public override void SetExecutedOrder(Order order)
         {
-            base.SetActiveOrder(activeOrderData);
+            base.SetExecutedOrder(order);
             
-            if (activeOrderData.groundOrder)
+            if (order.groundOrder)
             {
                 followingTarget = false;
                 targetTransform = null;
@@ -31,7 +31,7 @@ namespace Systems.Modules
             else
             {
                 followingTarget = true;
-                targetTransform = activeOrderData.targetTransform;
+                targetTransform = order.targetTransform;
             }
         }
 
@@ -39,11 +39,11 @@ namespace Systems.Modules
         {
             if (followingTarget && targetTransform == null)
             {
-                BroadcastOrderCompleted();
+                OrderCompleted();
                 return;
             }
-                
-            Vector3 relativePosition = orderData.GetOrderPosition() - unit.transform.position;
+
+            Vector3 relativePosition = executedOrder.GetOrderPosition() - unit.transform.position;
             
             //TODO: Go over types and assign behaviour to type
             
@@ -51,7 +51,7 @@ namespace Systems.Modules
             {
                 if (!followingTarget)
                 {
-                    BroadcastOrderCompleted();
+                    OrderCompleted();
                 }
                 return;
             }

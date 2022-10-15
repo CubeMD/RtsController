@@ -14,57 +14,47 @@ public class Unit : MonoBehaviour, IDestroyable
 
     [SerializeField] private LineRenderer lineRenderer;
 
-    public RtsAgent Owner { get; private set; }
-    
+    public RtsAgent owner;
     private UnitTemplate unitTemplate;
     private Environment environment;
-    private OrderData activeOrderData;
+    private readonly List<Order> assignedOrders = new List<Order>();
 
-    private readonly Dictionary<OrderType, List<OrderExecutionModule>> orderExecutionModulesTable 
+    private readonly Dictionary<OrderType, List<OrderExecutionModule>> orderTypeExecutionModulesTable 
         = new Dictionary<OrderType, List<OrderExecutionModule>>();
 
     private void OnDestroy()
     {
         OnDestroyableDestroy?.Invoke(this);
-        Owner.orderManager.RemoveUnitFromGraph(this);
-        Owner.ownedUnits.Remove(this);
 
-        if (Owner.selectedUnits.Contains(this))
+        foreach (Order assignedOrder in assignedOrders)
         {
-            Owner.selectedUnits.Remove(this);
+            assignedOrder.UnAssignUnit(this);
         }
     }
 
-    public void SetUnitTemplate(UnitTemplate template, RtsAgent unitOwner, Environment environment)
+    public void SetUnitTemplate(UnitTemplate template, RtsAgent unitOwner)
     {
-        Owner = unitOwner;
+        owner = unitOwner;
         unitTemplate = template;
-        this.environment = environment;
-        environment.OnEnvironmentReset += HandleEnvironmentReset;
-        Owner.orderManager.AddUnitToGraph(this);
-        Owner.ownedUnits.Add(this);
         
-        foreach (ModuleTemplate moduleTemplate in unitTemplate.moduleTemplates)
+        environment = unitOwner.environment;
+        environment.OnEnvironmentReset += HandleEnvironmentReset;
+        
+        foreach (OrderExecutionModuleTemplate orderExecutionModuleTemplate in unitTemplate.orderExecutionModuleTemplates)
         {
-            if (moduleTemplate != null)
+            if (orderExecutionModuleTemplate != null)
             {
-                Module module = moduleTemplate.GetModule(this);
-
-                if (module is OrderExecutionModule orderExecutionModule)
+                OrderExecutionModule orderExecutionModule = orderExecutionModuleTemplate.GetOrderExecutionModule(this);
+                
+                foreach (OrderType orderType in GetFlags(orderExecutionModule.orderType))
                 {
-                    IEnumerable<Enum> orderTypes = Enum.GetValues(typeof(OrderType)).Cast<Enum>()
-                        .Where(x => !Equals((int)(object)x, 0) && orderExecutionModule.orderType.HasFlag(x));
-                    
-                    foreach (OrderType orderType in orderTypes)
+                    if (!orderTypeExecutionModulesTable.ContainsKey(orderType))
                     {
-                        if (!orderExecutionModulesTable.ContainsKey(orderType))
-                        {
-                            orderExecutionModulesTable.Add(orderType, new List<OrderExecutionModule>{orderExecutionModule});
-                        }
-                        else
-                        {
-                            orderExecutionModulesTable[orderType].Add(orderExecutionModule);
-                        }
+                        orderTypeExecutionModulesTable.Add(orderType, new List<OrderExecutionModule>{orderExecutionModule});
+                    }
+                    else
+                    {
+                        orderTypeExecutionModulesTable[orderType].Add(orderExecutionModule);
                     }
                 }
             }
@@ -77,78 +67,106 @@ public class Unit : MonoBehaviour, IDestroyable
 
     public void Update()
     {
-        if (activeOrderData != null)
+        if (assignedOrders.Count > 0)
         {
-            orderExecutionModulesTable[activeOrderData.orderType].ForEach(x => x.Update());
-            RenderOrderLines();
+            ExecuteCurrentOrder();
         }
+        
+        RenderOrderLines();
+    }
+
+    public void ExecuteCurrentOrder()
+    {
+        orderTypeExecutionModulesTable[assignedOrders[0].orderType].ForEach(x => x.Update());
     }
     
     public bool CanExecuteOrderType(OrderType orderType)
     {
-        return orderExecutionModulesTable.ContainsKey(orderType);
+        return orderTypeExecutionModulesTable.ContainsKey(orderType);
     }
 
-    public void AssignActiveOrder(OrderData orderData)
+    public void AssignNewOrder(Order order, bool additive)
     {
-        if (orderData != null)
+        if (!additive)
         {
-            orderExecutionModulesTable.TryGetValue(orderData.orderType,
-                out List<OrderExecutionModule> orderExecutionModules);
-            
-            activeOrderData = orderData;
-    
-            foreach (OrderExecutionModule orderExecutionModule in orderExecutionModules)
-            {
-                orderExecutionModule.SetActiveOrder(activeOrderData);
-                SubscribeToOrderExecutionModule(orderExecutionModule);
-            }
+            UnAssignUnitFromAllOrders();
         }
-    }
-    
-    public void UnAssignActiveOrder()
-    {
-        if (activeOrderData != null && 
-            orderExecutionModulesTable.TryGetValue(activeOrderData.orderType, out List<OrderExecutionModule> orderExecutionModules))
-        {
-            foreach (OrderExecutionModule orderExecutionModule in orderExecutionModules)
-            {
-                orderExecutionModule.ClearActiveOrder();
-            }
-            
-            activeOrderData = null;
-        }
-    }
-
-    public void SubscribeToOrderExecutionModule(OrderExecutionModule module)
-    {
-        module.OnOrderCompleted += HandleOrderCompleted;
-        module.OnOrderDestroyed += HandleOrderDestroyed;
-    }
-
-    private void HandleOrderDestroyed(OrderExecutionModule module, OrderData orderData)
-    {
-        TerminateOrder(module, orderData);
-    }
-
-    public void HandleOrderCompleted(OrderExecutionModule module, OrderData orderData)
-    {
-        TerminateOrder(module, orderData);
-    }
-
-    private void TerminateOrder(OrderExecutionModule module, OrderData previousOrderData)
-    {
-        module.OnOrderCompleted -= HandleOrderCompleted;
-        module.OnOrderDestroyed -= HandleOrderDestroyed;
         
-        Owner.OrderComplete(previousOrderData, this);
-        UnAssignActiveOrder();
-        if (Owner.orderManager.TryTransitionUnitToNextOrder(this, out OrderData orderData))
+        assignedOrders.Add(order);
+
+        if (assignedOrders.Count == 1)
         {
-            AssignActiveOrder(orderData);
+            StartExecutingFirstAssignedOrder();
         }
     }
 
+    public void UnAssignOrder(Order order)
+    {
+        if (assignedOrders.IndexOf(order) == 0)
+        {
+            TransitionToNextOrder();
+        }
+        else
+        {
+            assignedOrders.Remove(order);
+        }
+    }
+
+    public void StartExecutingFirstAssignedOrder()
+    {
+        if (assignedOrders.Count > 0)
+        {
+            if (orderTypeExecutionModulesTable.TryGetValue(assignedOrders[0].orderType, out List<OrderExecutionModule> orderExecutionModules))
+            {
+                foreach (OrderExecutionModule orderExecutionModule in orderExecutionModules)
+                {
+                    orderExecutionModule.SetExecutedOrder(assignedOrders[0]);
+                    orderExecutionModule.OnOrderExecutionModuleCompletedOrder += HandleOrderExecutionModuleCompletedOrder;
+                }
+            }
+        }
+    }
+    
+    public void StopExecutingFirstAssignedOrder()
+    {
+        if (assignedOrders.Count > 0)
+        {
+            if (orderTypeExecutionModulesTable.TryGetValue(assignedOrders[0].orderType, out List<OrderExecutionModule> orderExecutionModules))
+            {
+                foreach (OrderExecutionModule orderExecutionModule in orderExecutionModules)
+                {
+                    orderExecutionModule.ClearActiveOrder();
+                    orderExecutionModule.OnOrderExecutionModuleCompletedOrder -= HandleOrderExecutionModuleCompletedOrder;
+                }
+            }
+        }
+    }
+
+    public void TransitionToNextOrder()
+    {
+        StopExecutingFirstAssignedOrder();
+        assignedOrders[0].UnAssignUnit(this);
+        assignedOrders.RemoveAt(0);
+        StartExecutingFirstAssignedOrder();
+    }
+    
+    public void UnAssignUnitFromAllOrders()
+    {
+        StopExecutingFirstAssignedOrder();
+
+        foreach (Order assignedOrder in assignedOrders)
+        {
+            assignedOrder.UnAssignUnit(this);
+        }
+        
+        assignedOrders.Clear();
+    }
+
+    public void HandleOrderExecutionModuleCompletedOrder(Unit unit, Order order)
+    {
+        TransitionToNextOrder();
+    }
+    
     public void HandleEnvironmentReset()
     {
         Destroy(gameObject);
@@ -160,23 +178,18 @@ public class Unit : MonoBehaviour, IDestroyable
         return gameObject;
     }
     
-    public void UnitCollectedMass(float amount)
-    {
-        Owner.UnitCollectedMass(amount);
-    }
-
     private void RenderOrderLines()
     {
         List<Vector3> points = new List<Vector3>{transform.position + Vector3.up};
 
-        if (activeOrderData != null)
-        {
-            points.Add(activeOrderData.position + Vector3.up);
-        }
-        
-        Owner.orderManager.GetTransitionsForUnit(this).ForEach(x => points.Add(x.position + Vector3.up));
-        
+        assignedOrders.ForEach(x => points.Add(x.position + Vector3.up));
+
         lineRenderer.positionCount = points.Count;
         lineRenderer.SetPositions(points.ToArray());
+    }
+
+    private static IEnumerable<Enum> GetFlags(Enum input)
+    {
+        return Enum.GetValues(input.GetType()).Cast<Enum>().Where(input.HasFlag);
     }
 }
