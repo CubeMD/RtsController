@@ -17,7 +17,7 @@ public class Unit : MonoBehaviour, IDestroyable
     public RtsAgent owner;
     private UnitTemplate unitTemplate;
     private Environment environment;
-    private readonly List<Order> assignedOrders = new List<Order>();
+    public readonly List<Order> assignedOrders = new List<Order>();
 
     private readonly Dictionary<OrderType, List<OrderExecutionModule>> orderTypeExecutionModulesTable 
         = new Dictionary<OrderType, List<OrderExecutionModule>>();

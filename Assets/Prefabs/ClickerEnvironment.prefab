@@ -16,7 +16,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &7912272080898073893
 Transform:
   m_ObjectHideFlags: 0
@@ -52,7 +52,7 @@ MonoBehaviour:
   numGaussianReclaim: 50
   agents:
   - {fileID: 6073555764631712557}
-  timeToReset: 100
+  timeToReset: 60
 --- !u!1001 &623692831023433168
 PrefabInstance:
   m_ObjectHideFlags: 0

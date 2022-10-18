@@ -33,8 +33,15 @@ public class Reclaim : MonoBehaviour, IDestroyable
     private void OnDestroy()
     {
         OnDestroyableDestroy?.Invoke(this);
-        
-        environment.OnEnvironmentReset -= HandleEnvironmentReset;
+
+        if (environment)
+        {
+            environment.OnEnvironmentReset -= HandleEnvironmentReset;
+        }
+        else
+        {
+            Debug.Log("EnvNotExistInReclaim");
+        }
     }
 
     public void SetEnvironmentOnDestroy(Environment environment)

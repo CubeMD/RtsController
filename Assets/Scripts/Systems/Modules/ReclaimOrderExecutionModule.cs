@@ -22,7 +22,14 @@ namespace Systems.Modules
         {
             base.SetExecutedOrder(order);
             
-            targetReclaim = order.targetTransform.GetComponent<Reclaim>();
+            if (order.targetTransform.TryGetComponent(out Reclaim reclaim))
+            {
+                targetReclaim = reclaim;
+            }
+            else
+            {
+                Debug.Log("ReclaimExecMod SetOrder");
+            }
         }
 
         public override void ClearActiveOrder()
@@ -39,9 +46,9 @@ namespace Systems.Modules
             {
                 float potentialReclaim = reclaimPower * Time.deltaTime;
 
-                float remainingReclaim = targetReclaim.Amount - potentialReclaim;
+                float remainingReclaim = Mathf.Max(targetReclaim.Amount - potentialReclaim, 0);
                 
-                float reclaimAmount = Mathf.Max(targetReclaim.Amount - potentialReclaim, 0);
+                float reclaimAmount = targetReclaim.Amount - remainingReclaim;
                 
                 targetReclaim.Amount = remainingReclaim;
                 

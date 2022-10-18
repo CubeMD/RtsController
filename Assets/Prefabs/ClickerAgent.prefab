@@ -222,7 +222,6 @@ GameObject:
   - component: {fileID: 1293692952763402599}
   - component: {fileID: 4952269660437515389}
   - component: {fileID: 7772815985065370233}
-  - component: {fileID: 4973703983311186130}
   - component: {fileID: 5218737999795667910}
   m_Layer: 0
   m_Name: ClickerAgent
@@ -259,11 +258,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BrainParameters:
-    VectorObservationSize: 3
+    VectorObservationSize: 6
     NumStackedVectorObservations: 1
     m_ActionSpec:
-      m_NumContinuousActions: 2
-      BranchSizes: 0500000002000000
+      m_NumContinuousActions: 3
+      BranchSizes: 0400000002000000
     VectorActionSize: 
     VectorActionDescriptions: []
     VectorActionSpaceType: 0
@@ -296,7 +295,6 @@ MonoBehaviour:
   reclaimSensorComponent: {fileID: 1293692952763402599}
   unitSensorComponent: {fileID: 4952269660437515389}
   orderSensorComponent: {fileID: 7772815985065370233}
-  linkSensorComponent: {fileID: 4973703983311186130}
   environment: {fileID: 0}
   orderPrefab: {fileID: 8539681309043346067, guid: ade729e9fe4744c49b0a7131f73507b0, type: 3}
   cam: {fileID: 1184532805882307112}
@@ -306,10 +304,12 @@ MonoBehaviour:
   selectionBoxTransform: {fileID: 6452324480876030273}
   unitPrefab: {fileID: 5783598507208318217, guid: cd3ee9b1e21424d40aee4acf19d8bc4e, type: 3}
   startingUnitTemplate: {fileID: 11400000, guid: 7a81450c883149b4f8194f72f5504815, type: 2}
-  numStartingUnits: 1
+  numStartingUnits: 5
+  startingUnitSpread: 20
   zoomSpeed: 30
   zoomMinMax: {x: 10, y: 100}
-  writeHeuristic: 1
+  writeHeuristic: 0
+  drawBufferSensorMonitor: 0
   interactableLayerMask:
     serializedVersion: 2
     m_Bits: 64
@@ -325,7 +325,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27ca2d0529f8c7545bc4bd53692786d3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  decisionPeriod: 25
+  decisionPeriod: 50
   takeActionsBetweenDecisions: 0
 --- !u!114 &1293692952763402599
 MonoBehaviour:
@@ -340,7 +340,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_SensorName: ReclaimSensor
-  m_ObservableSize: 5
+  m_ObservableSize: 3
   m_MaxNumObservables: 50
 --- !u!114 &4952269660437515389
 MonoBehaviour:
@@ -355,8 +355,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_SensorName: UnitSensor
-  m_ObservableSize: 5
-  m_MaxNumObservables: 50
+  m_ObservableSize: 3
+  m_MaxNumObservables: 5
 --- !u!114 &7772815985065370233
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -370,22 +370,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_SensorName: OrderSensor
-  m_ObservableSize: 5
-  m_MaxNumObservables: 50
---- !u!114 &4973703983311186130
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4799327343366791544}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dd8012d5925524537b27131fef517017, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_SensorName: LinkSensor
-  m_ObservableSize: 5
+  m_ObservableSize: 7
   m_MaxNumObservables: 50
 --- !u!114 &5218737999795667910
 MonoBehaviour:
@@ -402,7 +387,7 @@ MonoBehaviour:
   Record: 0
   NumStepsToRecord: 0
   DemonstrationName: Test
-  DemonstrationDirectory: C:\Users\marke\repos
+  DemonstrationDirectory: D:\
 --- !u!1 &4875339125753126977
 GameObject:
   m_ObjectHideFlags: 0
@@ -415,11 +400,11 @@ GameObject:
   - component: {fileID: 1184532805882307112}
   m_Layer: 0
   m_Name: Camera
-  m_TagString: Untagged
+  m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &6052563030240584686
 Transform:
   m_ObjectHideFlags: 0

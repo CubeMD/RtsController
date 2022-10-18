@@ -19,20 +19,19 @@ public class Environment : MonoBehaviour
     
     [Header("Agents")]
     [SerializeField] private List<RtsAgent> agents;
-    [SerializeField] private float timeToReset;
-
-    private float timeSinceReset;
     
+    public float timeToReset;
+    public float timeSinceReset;
+
     private void Awake()
     {
         halfGroundSize = ground.localScale.x / 2;
-
+        SpawnStartingReclaim();
+        
         foreach (RtsAgent rtsAgent in agents)
         {
             OnEnvironmentReset += rtsAgent.EndEpisode;
         }
-        
-        SpawnStartingReclaim();
     }
 
     public void Update()

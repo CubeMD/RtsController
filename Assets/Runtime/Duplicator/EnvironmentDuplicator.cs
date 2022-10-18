@@ -4,7 +4,7 @@ using Unity.MLAgents;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace Tools
+namespace AgentDebugTool.Scripts
 {
     /// <summary>
     /// Duplicates the environment rightwards, taking into account bounds and safety distance.
@@ -18,7 +18,7 @@ namespace Tools
         private GameObject environment;
        
         [SerializeField] [Tooltip("Overriden by python config")]
-        private int defaultNumCopies;
+        private int defaultNumEnvironments = 10;
         [SerializeField] [Tooltip("Overriden by python config")]
         private bool defaultMultiScene;
 
@@ -48,18 +48,17 @@ namespace Tools
         
         private void Start()
         {
-            int numEnvironments = (int)Academy.Instance.EnvironmentParameters.GetWithDefault("environments_per_unity_process", defaultNumCopies);
+            int numEnvironments = (int)Academy.Instance.EnvironmentParameters.GetWithDefault("environments_per_unity_process", defaultNumEnvironments);
             int multiSceneValue = (int)Academy.Instance.EnvironmentParameters.GetWithDefault("multi_scene", -1f);
             multiScene = multiSceneValue == -1 ? defaultMultiScene : multiSceneValue == 1;
         
             CreateSceneParameters csp = new CreateSceneParameters(LocalPhysicsMode.Physics3D);
             Bounds environmentBounds = CalculateEnvironmentBounds(environment);
             Vector3 firstEnvironmentPosition = environment.transform.position;
-            environment.SetActive(true);
-            
+        
             for (int i = 0; i < numEnvironments; i++)
             {
-                Vector3 pos = firstEnvironmentPosition + GetLayoutPosition(environmentBounds, i + 1);
+                Vector3 pos = firstEnvironmentPosition + GetLayoutPosition(environmentBounds, i);
                 GameObject env = Instantiate(environment, pos, environment.transform.rotation);
 
                 if (multiScene)
