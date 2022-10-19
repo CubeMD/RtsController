@@ -17,10 +17,8 @@ namespace Systems.Orders
         Capture = 16
     }
     
-    public class Order : MonoBehaviour, IDestroyable
+    public class Order : MonoBehaviour
     {
-        public event Action<IDestroyable> OnDestroyableDestroy;
-        
         [SerializeField] private Renderer ren;
 
         public Transform targetTransform;
@@ -29,7 +27,7 @@ namespace Systems.Orders
         public bool groundOrder;
         public Vector3 position;
         public RtsAgent owner;
-
+        private IDestroyable destroyable;
         
         [SuppressMessage("ReSharper", "ParameterHidesMember")]
         public void SetOrder(Transform targetTransform, OrderType orderType, List<Unit> assignedUnits, bool groundOrder, Vector3 position, RtsAgent owner, bool additive)
@@ -43,7 +41,8 @@ namespace Systems.Orders
 
             if (!groundOrder)
             {
-                targetTransform.GetComponent<IDestroyable>().OnDestroyableDestroy += HandleOrderDependencyDestroyed;
+                destroyable = targetTransform.GetComponent<IDestroyable>();
+                destroyable.OnDestroyableDestroy += HandleOrderDependencyDestroyed;
             }
 
             foreach (Unit assignedUnit in assignedUnits)
@@ -62,18 +61,16 @@ namespace Systems.Orders
             }
         }
 
-        public void HandleOrderDependencyDestroyed(IDestroyable destroyable)
+        private void HandleOrderDependencyDestroyed(IDestroyable destroyable)
         {
             Destroy(gameObject);
         }
         
         private void OnDestroy()
         {
-            OnDestroyableDestroy?.Invoke(this);
-            
-             if (!groundOrder && targetTransform != null)
+            if (destroyable != null)
             {
-                targetTransform.GetComponent<IDestroyable>().OnDestroyableDestroy -= HandleOrderDependencyDestroyed;
+                destroyable.OnDestroyableDestroy -= HandleOrderDependencyDestroyed;
             }
 
             foreach (Unit assignedUnit in assignedUnits.ToList())

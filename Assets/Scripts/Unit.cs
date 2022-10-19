@@ -166,11 +166,11 @@ public class Unit : MonoBehaviour, IDestroyable
     {
         TransitionToNextOrder();
     }
-    
-    public void HandleEnvironmentReset()
+
+    private void HandleEnvironmentReset()
     {
-        Destroy(gameObject);
         environment.OnEnvironmentReset -= HandleEnvironmentReset;
+        Destroy(gameObject);
     }
     
     public GameObject GetGameObject()

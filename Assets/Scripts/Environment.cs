@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Templates;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -34,6 +33,14 @@ public class Environment : MonoBehaviour
         }
     }
 
+    private void OnDestroy()
+    {
+        foreach (RtsAgent rtsAgent in agents)
+        {
+            OnEnvironmentReset -= rtsAgent.EndEpisode;
+        }
+    }
+
     public void Update()
     {
         timeSinceReset += Time.deltaTime;
@@ -61,7 +68,7 @@ public class Environment : MonoBehaviour
                 Random.Range(-halfGroundSize, halfGroundSize));
 
             Reclaim reclaim = Instantiate(reclaimPrefab, transform.localPosition + localPosition, Quaternion.identity, transform);
-            reclaim.SetEnvironmentOnDestroy(this);
+            reclaim.SetEnvironment(this);
             reclaim.SetRandomGaussianAmount(reclaimMinMax);
         }
     }

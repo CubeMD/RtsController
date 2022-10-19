@@ -1,5 +1,4 @@
-﻿using Systems.Interfaces;
-using Systems.Orders;
+﻿using Systems.Orders;
 using Templates.Modules;
 using UnityEngine;
 
@@ -20,6 +19,18 @@ namespace Systems.Modules
 
         public override void SetExecutedOrder(Order order)
         {
+            if (order == null)
+            {
+                Debug.LogError("SetExecutedOrder: order is null ");
+                return;
+            }
+
+            if (order.targetTransform == null)
+            {
+                Debug.LogError("SetExecutedOrder: order.targetTransform is null ");
+                return;
+            }
+            
             base.SetExecutedOrder(order);
             
             if (order.targetTransform.TryGetComponent(out Reclaim reclaim))
@@ -28,7 +39,7 @@ namespace Systems.Modules
             }
             else
             {
-                Debug.Log("ReclaimExecMod SetOrder");
+                Debug.LogError("ReclaimExecMod SetOrder");
             }
         }
 
@@ -40,6 +51,11 @@ namespace Systems.Modules
 
         public override void Update()
         {
+            if (targetReclaim.Amount <= 0)
+            {
+                return;
+            }
+            
             Vector3 reclaimOffset = targetReclaim.transform.position - unit.transform.position;
 
             if (reclaimOffset.magnitude - reclaimRange <= 0)

@@ -21,7 +21,8 @@ public class Reclaim : MonoBehaviour, IDestroyable
         {
             if (value <= 0)
             {
-                Destroy(gameObject);
+                amount = 0;
+                DestroyReclaim();
                 return;
             }
             
@@ -29,25 +30,11 @@ public class Reclaim : MonoBehaviour, IDestroyable
             ren.material.color = gradient.Evaluate(Mathf.InverseLerp(reclaimMinMax.x, reclaimMinMax.y, amount));
         }
     }
-    
-    private void OnDestroy()
-    {
-        OnDestroyableDestroy?.Invoke(this);
 
-        if (environment)
-        {
-            environment.OnEnvironmentReset -= HandleEnvironmentReset;
-        }
-        else
-        {
-            Debug.Log("EnvNotExistInReclaim");
-        }
-    }
-
-    public void SetEnvironmentOnDestroy(Environment environment)
+    public void SetEnvironment(Environment env)
     {
+        environment = env;
         environment.OnEnvironmentReset += HandleEnvironmentReset;
-        this.environment = environment;
     }
     
     public void SetRandomGaussianAmount(Vector2 rMinMax)
@@ -73,11 +60,6 @@ public class Reclaim : MonoBehaviour, IDestroyable
         float sigma = (rMinMax.y - mean) / 3.0f;
         Amount = Mathf.Clamp(std * sigma + mean, rMinMax.x, rMinMax.y);
     }
-
-    public void HandleEnvironmentReset()
-    {
-        Destroy(gameObject);
-    }
     
     private void SetReclaimMinMax(Vector2 rMinMax)
     {
@@ -87,5 +69,17 @@ public class Reclaim : MonoBehaviour, IDestroyable
     public GameObject GetGameObject()
     {
         return gameObject;
+    }
+
+    private void HandleEnvironmentReset()
+    {
+        DestroyReclaim();
+    }
+    
+    private void DestroyReclaim()
+    {
+        OnDestroyableDestroy?.Invoke(this);
+        environment.OnEnvironmentReset -= HandleEnvironmentReset;
+        Destroy(gameObject);
     }
 }

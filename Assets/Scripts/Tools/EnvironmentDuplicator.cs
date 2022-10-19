@@ -55,12 +55,12 @@ namespace Tools
             CreateSceneParameters csp = new CreateSceneParameters(LocalPhysicsMode.Physics3D);
             Bounds environmentBounds = CalculateEnvironmentBounds(environment);
             Vector3 firstEnvironmentPosition = environment.transform.position;
-            environment.SetActive(true);
-            
+
             for (int i = 0; i < numEnvironments; i++)
             {
                 Vector3 pos = firstEnvironmentPosition + GetLayoutPosition(environmentBounds, i + 1);
                 GameObject env = Instantiate(environment, pos, environment.transform.rotation);
+                env.SetActive(true);
 
                 if (multiScene)
                 {
@@ -69,6 +69,8 @@ namespace Tools
                     spawnedPhysicsScenes.Add(scene.GetPhysicsScene());
                 }
             }
+            
+            environment.SetActive(true);
         }
 
         private Vector3 GetLayoutPosition(Bounds bounds, int envNumber)

@@ -166,8 +166,6 @@ public class RtsAgent : DebuggableAgent
                     Monitor.Log("Type: ", "Unit", collider.transform);
                 }
             }
-
-
         }
 
         foreach (Unit ownedUnit in ownedUnits)
@@ -188,8 +186,11 @@ public class RtsAgent : DebuggableAgent
                     index
                 };
 
-                Monitor.Log("Data: ", string.Join(" ", orderObservation), ownedUnit.assignedOrders[index].transform);
-                Monitor.Log("Type: ", "Order", ownedUnit.assignedOrders[index].transform);
+                if (drawBufferSensorMonitor)
+                {
+                    Monitor.Log("Data: ", string.Join(" ", orderObservation), ownedUnit.assignedOrders[index].transform);
+                    Monitor.Log("Type: ", "Order", ownedUnit.assignedOrders[index].transform);
+                }
 
                 orderSensorComponent.AppendObservation(orderObservation.ToArray());
             }
