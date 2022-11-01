@@ -156,6 +156,7 @@ public class Unit : MonoBehaviour, IDestroyable
 
         foreach (Order assignedOrder in assignedOrders)
         {
+            owner.UnAssignedUnitOrder();
             assignedOrder.UnAssignUnit(this);
         }
         

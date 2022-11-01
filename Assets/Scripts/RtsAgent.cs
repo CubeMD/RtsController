@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using AgentDebugTool.Scripts.Agent;
 using Systems.Interfaces;
 using Systems.Orders;
@@ -10,26 +11,56 @@ using Unity.Mathematics;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 using UnityEngine;
+using UnityEngine.UIElements;
+using Cursor = UnityEngine.Cursor;
 using Random = UnityEngine.Random;
 
 public class RtsAgent : DebuggableAgent
 {
-    private enum ActionType
+    public enum AgentActionType
     {
-        MoveCamera = 0,
+        None = 0,
         LeftDrag = 1,
         RightClick = 2,
-        None = 3
+        ZoomIn = 3,
+        ZoomOut = 4
     }
+    
+    private class RtsAgentAction
+    {
+        public Vector2 currentCursorAction;
+        public float timeForScheduledDecision;
+        public AgentActionType currentAgentActionType;
+        public bool currentShiftAction;
+        public RtsAgentAction(Vector2 currentCursorAction, float timeForScheduledDecision, AgentActionType currentAgentActionType, bool currentShiftAction)
+        {
+            this.currentCursorAction = currentCursorAction;
+            this.timeForScheduledDecision = timeForScheduledDecision;
+            this.currentAgentActionType = currentAgentActionType;
+            this.currentShiftAction = currentShiftAction;
+        }
 
-    [Header("Objects")]
+        public RtsAgentAction()
+        {
+            
+        }
+    }
+    
+    [Header("Systems")]
     [SerializeField] private BufferSensorComponent reclaimSensorComponent;
     [SerializeField] private BufferSensorComponent unitSensorComponent;
     [SerializeField] private BufferSensorComponent orderSensorComponent;
     [SerializeField] public Environment environment;
     [SerializeField] public Order orderPrefab;
     [SerializeField] private Camera cam;
+    
+    [Header("Transforms")]
     [SerializeField] private Transform cameraTransform;
     [SerializeField] private Transform cameraGizmoTransform;
     [SerializeField] private Transform cursorTransform;
@@ -43,19 +74,22 @@ public class RtsAgent : DebuggableAgent
     
     [Header("Parameters")]
     [SerializeField] private float zoomSpeed;
+    [SerializeField] private float cameraMovementBorderPercentage;
+    [SerializeField] private float cameraPanningSpeed;
     [SerializeField] private Vector2 zoomMinMax;
-    [SerializeField] private bool writeHeuristic;
-    [SerializeField] private bool drawBufferSensorMonitor;
+    [SerializeField] private Vector2 decisionTimeMinMax;
     [SerializeField] private LayerMask interactableLayerMask;
 
-    public readonly List<Unit> ownedUnits = new List<Unit>();
-    public readonly List<Unit> selectedUnits = new List<Unit>();
+    [Header("Extra")]
+    [SerializeField] private bool isHuman;
+    [SerializeField] private bool drawBufferSensorMonitor;
     
-    private bool primaryActionHasBeenRecorded;
-    private Vector2 recordedCursorAction;
-    private float recordedZoomAction;
-    private ActionType recordedPrimaryAction = ActionType.None;
-    private bool recordedShiftAction;
+    private readonly List<Unit> ownedUnits = new List<Unit>();
+    private readonly List<Unit> selectedUnits = new List<Unit>();
+    
+    private RtsAgentAction completedRtsAgentAction;
+    private float timeSinceLastDecision;
+    private Vector3 accumulatedCameraOffset;
 
     private float CameraZoom
     {
@@ -63,7 +97,7 @@ public class RtsAgent : DebuggableAgent
         set
         {
             cam.orthographicSize = value;
-            Vector3 gizmoScale = Vector3.one * value * 2;
+            Vector3 gizmoScale = Vector3.one * (value * 2);
             gizmoScale.y = 1;
             cameraGizmoTransform.localScale = gizmoScale;
         }
@@ -71,6 +105,47 @@ public class RtsAgent : DebuggableAgent
 
     private float MapSize => environment.halfGroundSize;
     
+    private void Awake()
+    {
+        if (isHuman)
+        {
+#if UNITY_EDITOR
+            EditorApplication.ExecuteMenuItem("Window/General/Game");
+#endif
+            Cursor.lockState = CursorLockMode.Confined;
+        }
+
+        Academy.Instance.AgentPreStep += MakeRequests;
+    }
+
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+        
+        if (Academy.IsInitialized)
+        {
+            Academy.Instance.AgentPreStep -= MakeRequests;
+        }
+    }
+    
+    private void MakeRequests(int academyStepCount)
+    {
+        if (isHuman && completedRtsAgentAction != null)
+        {
+            RequestDecision();
+        }
+        else if (!isHuman)
+        {
+            timeSinceLastDecision += Time.fixedDeltaTime;
+            
+            if (completedRtsAgentAction == null || timeSinceLastDecision >= completedRtsAgentAction.timeForScheduledDecision)
+            {
+                timeSinceLastDecision = 0;
+                RequestDecision();
+            }
+        }
+    }
+
     public override void OnEpisodeBegin()
     {
         CameraZoom = zoomMinMax.x;
@@ -82,10 +157,9 @@ public class RtsAgent : DebuggableAgent
         ownedUnits.Clear();
         selectedUnits.Clear();
 
-        primaryActionHasBeenRecorded = false;
-        recordedCursorAction = Vector2.zero;
-        recordedPrimaryAction = ActionType.None;
-        recordedShiftAction = false;
+        completedRtsAgentAction = null;
+        timeSinceLastDecision = 0;
+        accumulatedCameraOffset = Vector3.zero;
 
         SpawnStartingUnits();
     }
@@ -103,7 +177,7 @@ public class RtsAgent : DebuggableAgent
         }
     }
 
-    public void SpawnUnit(UnitTemplate unitTemplate, Vector3 localPosition)
+    private void SpawnUnit(UnitTemplate unitTemplate, Vector3 localPosition)
     {
         Unit unit = Instantiate(unitPrefab, transform.parent.localPosition + localPosition, Quaternion.identity, transform.parent);
         unit.SetUnitTemplate(unitTemplate, this);
@@ -111,9 +185,174 @@ public class RtsAgent : DebuggableAgent
         ownedUnits.Add(unit);
     }
     
+    private void Update()
+    {
+        if (!isHuman || 
+            !Application.isFocused ||
+            completedRtsAgentAction != null ||
+            Input.mousePosition.x < 0 ||
+            Input.mousePosition.x > 1000 ||
+            Input.mousePosition.y < 0 ||
+            Input.mousePosition.y > 1000) return;
+
+        timeSinceLastDecision += Time.deltaTime;
+        
+        Vector3 humanCursorPositionRelativeToCamera = cameraTransform.InverseTransformPoint(cam.ScreenToWorldPoint(Input.mousePosition));
+
+        float startCameraMovementDistance = CameraZoom * (1 - cameraMovementBorderPercentage);
+
+        Vector3 cameraOffsetDirection = Vector3.zero;
+        
+        if (humanCursorPositionRelativeToCamera.x >= startCameraMovementDistance || 
+            humanCursorPositionRelativeToCamera.x <= -startCameraMovementDistance)
+        {
+            cameraOffsetDirection += Vector3.right * Mathf.Sign(humanCursorPositionRelativeToCamera.x);
+        }
+        
+        if (humanCursorPositionRelativeToCamera.z >= startCameraMovementDistance ||
+            humanCursorPositionRelativeToCamera.z <= -startCameraMovementDistance)
+        {
+            cameraOffsetDirection += Vector3.forward * Mathf.Sign(humanCursorPositionRelativeToCamera.z);
+        }
+        
+        if (cameraOffsetDirection != Vector3.zero)
+        {
+            if (accumulatedCameraOffset != Vector3.zero && cameraOffsetDirection.normalized != accumulatedCameraOffset.normalized)
+            {
+                completedRtsAgentAction ??= new RtsAgentAction
+                {
+                    currentAgentActionType = AgentActionType.None
+                };
+            }
+            else
+            {
+                Vector3 cameraOffset = cameraOffsetDirection.normalized * (cameraPanningSpeed * Time.deltaTime * zoomSpeed / zoomMinMax.x);
+            
+                Vector3 cameraOffsetCorrected = new Vector3(
+                    Mathf.Clamp(cameraOffset.x, Mathf.Max(-MapSize - cameraTransform.localPosition.x + CameraZoom, cursorTransform.localPosition.x - CameraZoom), Mathf.Min(MapSize - cameraTransform.localPosition.x - CameraZoom, cursorTransform.localPosition.x + CameraZoom)),
+                    0f,
+                    Mathf.Clamp(cameraOffset.z, Mathf.Max(-MapSize - cameraTransform.localPosition.z + CameraZoom, cursorTransform.localPosition.z - CameraZoom), Mathf.Min(MapSize - cameraTransform.localPosition.z - CameraZoom, cursorTransform.localPosition.z + CameraZoom)));
+            
+                Vector3 correction = cameraOffsetCorrected - cameraOffset;
+                
+                if (Mathf.Abs(correction.x) > 0 || Mathf.Abs(correction.z) > 0)
+                {
+                    completedRtsAgentAction ??= new RtsAgentAction
+                    {
+                        currentAgentActionType = AgentActionType.None
+                    };
+                }
+            
+                accumulatedCameraOffset += cameraOffsetCorrected;
+                cameraTransform.localPosition += cameraOffsetCorrected;
+                cursorTransform.localPosition -= cameraOffsetCorrected;
+            }
+        }
+        else if (accumulatedCameraOffset != Vector3.zero)
+        {
+            completedRtsAgentAction ??= new RtsAgentAction
+            {
+                currentAgentActionType = AgentActionType.None
+            };
+        }
+        else if (Input.mouseScrollDelta.y != 0)
+        {
+            completedRtsAgentAction ??= new RtsAgentAction
+            {
+                currentAgentActionType = -Input.mouseScrollDelta.y < 0 ? AgentActionType.ZoomOut : AgentActionType.ZoomIn
+            };
+        }
+        else if (Input.GetKeyDown(KeyCode.Mouse0))
+        {
+            completedRtsAgentAction ??= new RtsAgentAction
+            {
+                currentAgentActionType = AgentActionType.None
+            };
+        }
+        else if (Input.GetKeyUp(KeyCode.Mouse0))
+        {
+            completedRtsAgentAction ??= new RtsAgentAction
+            {
+                currentAgentActionType = AgentActionType.LeftDrag
+            };
+        }
+        else if (Input.GetKeyDown(KeyCode.Mouse1))
+        {
+            completedRtsAgentAction ??= new RtsAgentAction
+            {
+                currentAgentActionType = AgentActionType.RightClick
+            };
+        }
+
+        if (completedRtsAgentAction != null)
+        {
+            if (completedRtsAgentAction.currentAgentActionType == AgentActionType.None && 
+                accumulatedCameraOffset != Vector3.zero)
+            {
+                Vector3 totalHumanCursorOffset =
+                    accumulatedCameraOffset - cursorTransform.localPosition;
+
+                completedRtsAgentAction.currentCursorAction = new Vector2(
+                    Mathf.Clamp(totalHumanCursorOffset.x / CameraZoom / 2, -1f, 1), 
+                    Mathf.Clamp(totalHumanCursorOffset.z / CameraZoom / 2, -1f, 1));
+            }
+            else
+            {
+                Vector3 humanCursorPositionRelativeToCursor = cursorTransform.InverseTransformPoint(cam.ScreenToWorldPoint(Input.mousePosition));
+
+                if (accumulatedCameraOffset != Vector3.zero)
+                {
+                    Debug.Log("accumulated offset with wrong action type");
+                }
+                
+                completedRtsAgentAction.currentCursorAction = new Vector2(
+                    Mathf.Clamp(humanCursorPositionRelativeToCursor.x / CameraZoom / 2, -1f, 1), 
+                    Mathf.Clamp(humanCursorPositionRelativeToCursor.z / CameraZoom / 2, -1f, 1));
+            }
+
+
+
+
+            cameraTransform.localPosition -= accumulatedCameraOffset;
+            cursorTransform.localPosition += accumulatedCameraOffset;
+            Debug.Log($"after reset cameraTransform.localPosition {cameraTransform.localPosition}, cursorTransform.localPosition {cursorTransform.localPosition}");
+            
+            completedRtsAgentAction.timeForScheduledDecision = timeSinceLastDecision;
+            timeSinceLastDecision = 0;
+            accumulatedCameraOffset = Vector3.zero;
+         
+            //Debug.Log($"Update end. timeSinceDecision: {timeSinceDecision}, timeWhenToDecide: {timeWhenToDecide}, shouldRequestDecision: {shouldRequestDecision}");
+        
+            if (Input.GetKey(KeyCode.LeftShift))
+            {
+                completedRtsAgentAction.currentShiftAction = true;
+            }
+         
+            InteractWithEnvironment(completedRtsAgentAction);
+        }
+    }
+    
+    public override void Heuristic(in ActionBuffers actionsOut)
+    {
+        ActionSegment<float> continuousActions = actionsOut.ContinuousActions;
+        ActionSegment<int> discreteActions = actionsOut.DiscreteActions;
+        
+        continuousActions[0] = completedRtsAgentAction.currentCursorAction.x;
+        continuousActions[1] = completedRtsAgentAction.currentCursorAction.y;
+        continuousActions[2] = Mathf.InverseLerp(decisionTimeMinMax.x, decisionTimeMinMax.y, completedRtsAgentAction.timeForScheduledDecision);
+        
+        discreteActions[0] = (int)completedRtsAgentAction.currentAgentActionType;
+        discreteActions[1] = completedRtsAgentAction.currentShiftAction ? 1 : 0;
+
+        completedRtsAgentAction = null;
+
+        //Debug.Log($"Heuristic. Decide val {continuousActions[3]}");
+    }
+    
     public override void CollectObservations(VectorSensor sensor)
     {
         Monitor.RemoveAllValuesFromAllTransforms();
+        
         Vector3 camRelNormPos = cursorTransform.InverseTransformPoint(cameraTransform.position) / CameraZoom;
         Vector2 camPosObservation = new Vector2(camRelNormPos.x, camRelNormPos.z);
         sensor.AddObservation(camPosObservation);
@@ -129,7 +368,7 @@ public class RtsAgent : DebuggableAgent
         sensor.AddObservation(zoomObservation);
         observationsDebugSet.Add("Zoom", $"{zoomObservation}");
         
-        float time = environment.timeSinceReset / environment.timeToReset;
+        float time = environment.timeSinceReset / environment.timeWhenReset;
         sensor.AddObservation(time);
         observationsDebugSet.Add("Time", $"{time}");
 
@@ -166,216 +405,159 @@ public class RtsAgent : DebuggableAgent
                     Monitor.Log("Type: ", "Unit", collider.transform);
                 }
             }
-        }
-
-        foreach (Unit ownedUnit in ownedUnits)
-        {
-            for (int index = 0; index < ownedUnit.assignedOrders.Count; index++)
+            else if (collider.TryGetComponent(out Order order))
             {
-                Vector3 relUnitNormPos = cursorTransform.InverseTransformPoint(ownedUnit.transform.position) / MapSize;
-                Vector3 relOrderNormPos = cursorTransform.InverseTransformPoint(ownedUnit.assignedOrders[index].transform.position) / MapSize;
+                foreach (Unit assignedUnit in order.assignedUnits)
+                {
+                    Vector3 relUnitNormPos = cursorTransform.InverseTransformPoint(assignedUnit.transform.position) / MapSize;
+                    Vector3 relOrderNormPos = cursorTransform.InverseTransformPoint(order.transform.position) / MapSize;
                 
-                List<float> orderObservation = new List<float>
-                {
-                    relUnitNormPos.x,
-                    relUnitNormPos.z,
-                    relOrderNormPos.x,
-                    relOrderNormPos.z,
-                    ownedUnit.assignedOrders[index].orderType == OrderType.Move ? 1 : 0,
-                    ownedUnit.assignedOrders[index].orderType == OrderType.Reclaim ? 1 : 0,
-                    index
-                };
+                    List<float> orderObservation = new List<float>
+                    {
+                        relUnitNormPos.x,
+                        relUnitNormPos.z,
+                        relOrderNormPos.x,
+                        relOrderNormPos.z,
+                        order.orderType == OrderType.Move ? 1 : 0,
+                        order.orderType == OrderType.Reclaim ? 1 : 0,
+                        assignedUnit.assignedOrders.IndexOf(order)
+                    };
 
-                if (drawBufferSensorMonitor)
-                {
-                    Monitor.Log("Data: ", string.Join(" ", orderObservation), ownedUnit.assignedOrders[index].transform);
-                    Monitor.Log("Type: ", "Order", ownedUnit.assignedOrders[index].transform);
+                    if (drawBufferSensorMonitor)
+                    {
+                        Monitor.Log("Data: ", string.Join(" ", orderObservation), order.transform);
+                        Monitor.Log("Type: ", "Order", order.transform);
+                    }
+
+                    orderSensorComponent.AppendObservation(orderObservation.ToArray());
                 }
-
-                orderSensorComponent.AppendObservation(orderObservation.ToArray());
             }
         }
-        
+        //Debug.Log($"Obs. environment.timeSinceReset at {environment.timeSinceReset}, agent time since decision {timeSinceDecision}");
         BroadcastObservationsCollected();
     }
 
-    private void Update()
-    {
-        if (!writeHeuristic) return;
-        
-        recordedZoomAction = Mathf.Clamp(recordedZoomAction - Input.mouseScrollDelta.y / 3f, -1f, 1f);
-        
-        if (primaryActionHasBeenRecorded) return;
-        
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            recordedPrimaryAction = ActionType.None;
-            primaryActionHasBeenRecorded = true;
-        } 
-        else if (Input.GetKeyDown(KeyCode.Mouse0))
-        {
-            recordedPrimaryAction = ActionType.LeftDrag;
-            primaryActionHasBeenRecorded = true;
-        }
-        else if (Input.GetKeyDown(KeyCode.Mouse1))
-        {
-            recordedPrimaryAction = ActionType.RightClick;
-            primaryActionHasBeenRecorded = true;
-        }
-        else if (Input.GetKeyDown(KeyCode.Mouse2))
-        {
-            recordedPrimaryAction = ActionType.MoveCamera;
-            primaryActionHasBeenRecorded = true;
-        }
-        else
-        {
-            return;
-        }
-
-        if (Input.GetKey(KeyCode.LeftShift))
-        {
-            recordedShiftAction = true;
-        }
-        
-        Vector3 cursorLocalPos = cursorTransform.transform.InverseTransformPoint(cam.ScreenToWorldPoint(new Vector3(
-            Mathf.Clamp(Input.mousePosition.x, 0, 1000), 
-            Mathf.Clamp(Input.mousePosition.y, 0, 1000),
-            25)));
-        
-        recordedCursorAction = new Vector2(
-            Mathf.Clamp(cursorLocalPos.x / CameraZoom / 2, -1f, 1),
-            Mathf.Clamp(cursorLocalPos.z / CameraZoom / 2 , -1f, 1));
-        
-        //Debug.Log($"Heuristic action: {cursorAction}, {zoomAction}, {actionType}, {shiftAction}");
-    }
-    
-    public override void Heuristic(in ActionBuffers actionsOut)
-    {
-        ActionSegment<float> continuousActions = actionsOut.ContinuousActions;
-        ActionSegment<int> discreteActions = actionsOut.DiscreteActions;
-        
-        continuousActions[0] = recordedCursorAction.x;
-        continuousActions[1] = recordedCursorAction.y;
-        continuousActions[2] = recordedZoomAction;
-        
-        discreteActions[0] = (int)recordedPrimaryAction;
-        discreteActions[1] = recordedShiftAction ? 1 : 0;
-        
-        primaryActionHasBeenRecorded = false;
-        recordedCursorAction = Vector2.zero;
-        recordedZoomAction = 0;
-        recordedPrimaryAction = ActionType.None;
-        recordedShiftAction = false;
-    }
-    
     public override void OnActionReceived(ActionBuffers actions)
     {
         base.OnActionReceived(actions);
         
-        AddReward(-0.001f);
-        
-        selectionBoxTransform.localScale = Vector3.zero;
-        selectionBoxTransform.localPosition = Vector3.zero;
-
         ActionSegment<float> continuousActions = actions.ContinuousActions;
         ActionSegment<int> discreteActions = actions.DiscreteActions;
         
-        ActionType currentPrimaryAction = (ActionType)discreteActions[0];
-        bool currentShiftAction = discreteActions[1] == 1;
-        
-        Vector2 currentCursorAction = 2 * new Vector2(
+        Vector2 currentCursorAction = new Vector2(
             Mathf.Clamp(continuousActions[0], -1f, 1f),
             Mathf.Clamp(continuousActions[1], -1f, 1f));
-        
-        float currentZoomAction = Mathf.Clamp(continuousActions[2], -1f, 1f);
+        float currentDelayAction = Mathf.Clamp(continuousActions[2], -1f, 1f);
+
+        AgentActionType currentAgentActionType = (AgentActionType)discreteActions[0];
+        bool currentShiftAction = discreteActions[1] == 1;
         
         // Regularize continuous actions
-        AddReward(-0.01f * (currentCursorAction.magnitude * currentCursorAction.magnitude / 4f));
-        AddReward(-0.01f * (currentZoomAction * currentZoomAction));
+        AddReward(-0.01f * environment.timeSinceReset / environment.timeWhenReset);
+        //AddReward(-0.01f * (currentCursorAction.magnitude * currentCursorAction.magnitude / 4f));
+        //AddReward(-0.01f * (currentZoomAction * currentZoomAction));
         
-        if (currentPrimaryAction == ActionType.MoveCamera)
+        if (!isHuman)
         {
-            // Move Camera
-            Vector3 desiredCameraLocalPosition = cameraTransform.localPosition + new Vector3(
-                CameraZoom * currentCursorAction.x,
-                0f,
-                CameraZoom * currentCursorAction.y);
-            
-            cameraTransform.localPosition = new Vector3(
-                Mathf.Clamp(desiredCameraLocalPosition.x, -MapSize + CameraZoom, MapSize - CameraZoom),
-                0f,
-                Mathf.Clamp(desiredCameraLocalPosition.z, -MapSize + CameraZoom, MapSize - CameraZoom));
+            float timeForScheduledDecision = Mathf.Lerp(decisionTimeMinMax.x, decisionTimeMinMax.y, (currentDelayAction + 1 ) / 2);
+            InteractWithEnvironment(new RtsAgentAction(currentCursorAction, timeForScheduledDecision, currentAgentActionType, currentShiftAction));
         }
         else
         {
-            // Move cursor
-            Vector3 clampedCursorOffset = new Vector3(
-                Mathf.Clamp(CameraZoom * currentCursorAction.x,
-                    -CameraZoom - cursorTransform.localPosition.x, CameraZoom - cursorTransform.localPosition.x),
-                0f,
-                Mathf.Clamp(CameraZoom * currentCursorAction.y,
-                    -CameraZoom - cursorTransform.localPosition.z, CameraZoom - cursorTransform.localPosition.z));
-
-            cursorTransform.localPosition += clampedCursorOffset;
-
-            if (currentPrimaryAction == ActionType.LeftDrag)
-            {
-                // Left click
-                selectionBoxTransform.localScale = new Vector3(Mathf.Abs(clampedCursorOffset.x), 1, Mathf.Abs(clampedCursorOffset.z));
-                selectionBoxTransform.localPosition = cursorTransform.localPosition - clampedCursorOffset / 2;
-
-                if (!currentShiftAction)
-                {
-                    selectedUnits.Clear();
-                }
-
-                foreach (Collider col in Physics.OverlapBox(selectionBoxTransform.position,
-                             selectionBoxTransform.localScale / 2,
-                             Quaternion.identity,
-                             interactableLayerMask))
-                {
-                    if (col.TryGetComponent(out Unit unit) && ownedUnits.Contains(unit) &&
-                        !selectedUnits.Contains(unit))
-                    {
-                        selectedUnits.Add(unit);
-                    }
-                }
-            }
-            else if (currentPrimaryAction == ActionType.RightClick)
-            {
-                //Right click
-                Ray ray = new Ray(cursorTransform.position + Vector3.up * 25f, Vector3.down);
-
-                if (Physics.Raycast(ray, out RaycastHit hitInfo, 50f, interactableLayerMask))
-                {
-                    CreateAndAssignOrder(hitInfo, selectedUnits, currentShiftAction);
-                }
-            }
+            //lastAgentCursorPos = cameraTransform.localPosition + cursorTransform.localPosition;
         }
         
-        Zoom(currentZoomAction);
+        //Debug.Log($"Action. currentDelayAction: {currentDelayAction}");
     }
 
-    private void Zoom(float currentZoomDelta)
+    private void InteractWithEnvironment(RtsAgentAction rtsAgentAction)
     {
-        float clampedDeltaZoom = Mathf.Clamp(currentZoomDelta * zoomSpeed, zoomMinMax.x - CameraZoom, zoomMinMax.y - CameraZoom);
-
-        if (clampedDeltaZoom < 0)
-        {
-            cameraTransform.localPosition += cursorTransform.localPosition * (1 - Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom + clampedDeltaZoom)) * 0.4f;
-        }
-            
-        cursorTransform.localPosition *= (CameraZoom + clampedDeltaZoom) / CameraZoom;
-        CameraZoom += clampedDeltaZoom;
-            
-        Vector3 mapSizeCorrectedCameraPosition = new Vector3(
-            Mathf.Clamp(cameraTransform.localPosition.x, -MapSize + CameraZoom, MapSize - CameraZoom),
+        selectionBoxTransform.localScale = Vector3.zero;
+        selectionBoxTransform.localPosition = Vector3.zero;
+        
+        // Move cursor
+        Vector3 desiredCursorOffset = 2 * new Vector3(
+            CameraZoom * rtsAgentAction.currentCursorAction.x,
+            0,
+            CameraZoom * rtsAgentAction.currentCursorAction.y);
+        
+        Vector3 clampedCursorOffset = new Vector3(
+            Mathf.Clamp(desiredCursorOffset.x, -CameraZoom - cursorTransform.localPosition.x, CameraZoom - cursorTransform.localPosition.x),
             0f,
-            Mathf.Clamp(cameraTransform.localPosition.z, -MapSize + CameraZoom, MapSize - CameraZoom));
+            Mathf.Clamp(desiredCursorOffset.z, -CameraZoom - cursorTransform.localPosition.z, CameraZoom - cursorTransform.localPosition.z));
+        
+        Vector3 cursorOffsetCorrection = clampedCursorOffset - desiredCursorOffset;
+        cursorTransform.localPosition += clampedCursorOffset;
+        
+        //Zoom camera and correct mouse
+        int currentZoomOffsetAction = rtsAgentAction.currentAgentActionType switch
+        {
+            AgentActionType.ZoomIn => 1,
+            AgentActionType.ZoomOut => -1,
+            _ => 0
+        };
+        
+        if (currentZoomOffsetAction != 0)
+        {
+            float clampedZoomOffset = Mathf.Clamp(currentZoomOffsetAction * zoomSpeed, zoomMinMax.x - CameraZoom, zoomMinMax.y - CameraZoom);
 
-        cameraTransform.localPosition = mapSizeCorrectedCameraPosition;
+            if (clampedZoomOffset < 0)
+            {
+                cameraTransform.localPosition += cursorTransform.localPosition * ((1 - Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom + clampedZoomOffset)) * 0.4f);
+            }
+            
+            cursorTransform.localPosition *= (CameraZoom + clampedZoomOffset) / CameraZoom;
+            CameraZoom += clampedZoomOffset;
+        }
+        
+        // Move Camera
+        Vector3 desiredCameraOffset = new Vector3(
+            desiredCursorOffset.x > 0 ? Mathf.Min(cursorOffsetCorrection.x, 0) : Mathf.Max(cursorOffsetCorrection.x, 0),
+            0,
+            desiredCursorOffset.z > 0 ? Mathf.Min(cursorOffsetCorrection.z, 0) : Mathf.Max(cursorOffsetCorrection.z, 0));
+
+        Vector3 desiredCameraPosition = cameraTransform.localPosition - desiredCameraOffset;
+            
+        cameraTransform.localPosition = new Vector3(
+            Mathf.Clamp(desiredCameraPosition.x, -MapSize + CameraZoom, MapSize - CameraZoom),
+            0f,
+            Mathf.Clamp(desiredCameraPosition.z, -MapSize + CameraZoom, MapSize - CameraZoom));
+        
+        if (rtsAgentAction.currentAgentActionType == AgentActionType.LeftDrag)
+        {
+            // Left click
+            selectionBoxTransform.localScale = new Vector3(Mathf.Abs(clampedCursorOffset.x), 1, Mathf.Abs(clampedCursorOffset.z));
+            selectionBoxTransform.localPosition = cursorTransform.localPosition - clampedCursorOffset / 2;
+
+            if (!rtsAgentAction.currentShiftAction)
+            {
+                selectedUnits.Clear();
+            }
+
+            foreach (Collider col in Physics.OverlapBox(selectionBoxTransform.position,
+                         selectionBoxTransform.localScale / 2,
+                         Quaternion.identity,
+                         interactableLayerMask))
+            {
+                if (col.TryGetComponent(out Unit unit) && ownedUnits.Contains(unit) &&
+                    !selectedUnits.Contains(unit))
+                {
+                    selectedUnits.Add(unit);
+                }
+            }
+        }
+        else if (rtsAgentAction.currentAgentActionType == AgentActionType.RightClick)
+        {
+            //Right click
+            Ray ray = new Ray(cursorTransform.position + Vector3.up * 25f, Vector3.down);
+
+            if (Physics.Raycast(ray, out RaycastHit hitInfo, 50f, interactableLayerMask))
+            {
+                CreateAndAssignOrder(hitInfo, selectedUnits, rtsAgentAction.currentShiftAction);
+            }
+        }
     }
-    
+
     public void CreateAndAssignOrder(RaycastHit hitInfo, List<Unit> assignedUnits, bool additive)
     {
         OrderType orderType;
@@ -400,7 +582,7 @@ public class RtsAgent : DebuggableAgent
 
         if (capableUnits.Count < 1) return;
         
-        Order order = Instantiate(orderPrefab, groundHitPosition, Quaternion.identity, transform);
+        Order order = Instantiate(orderPrefab, groundHitPosition, Quaternion.identity, transform.parent);
 
         order.SetOrder(hitInfo.transform, orderType, capableUnits, groundOrder, groundHitPosition, this, additive);
     }
@@ -423,5 +605,10 @@ public class RtsAgent : DebuggableAgent
         {
             selectedUnits.Remove(unit);
         }
+    }
+
+    public void UnAssignedUnitOrder()
+    {
+        //AddReward(-0.005f);
     }
 }

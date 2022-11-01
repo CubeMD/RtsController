@@ -19,28 +19,8 @@ namespace Systems.Modules
 
         public override void SetExecutedOrder(Order order)
         {
-            if (order == null)
-            {
-                Debug.LogError("SetExecutedOrder: order is null ");
-                return;
-            }
-
-            if (order.targetTransform == null)
-            {
-                Debug.LogError("SetExecutedOrder: order.targetTransform is null ");
-                return;
-            }
-            
             base.SetExecutedOrder(order);
-            
-            if (order.targetTransform.TryGetComponent(out Reclaim reclaim))
-            {
-                targetReclaim = reclaim;
-            }
-            else
-            {
-                Debug.LogError("ReclaimExecMod SetOrder");
-            }
+            targetReclaim = order.targetTransform.GetComponent<Reclaim>();
         }
 
         public override void ClearActiveOrder()

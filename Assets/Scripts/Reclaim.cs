@@ -19,14 +19,14 @@ public class Reclaim : MonoBehaviour, IDestroyable
         get => amount;
         set
         {
-            if (value <= 0)
+            amount = value;
+            
+            if (amount <= 0)
             {
-                amount = 0;
                 DestroyReclaim();
                 return;
             }
-            
-            amount = value;
+
             ren.material.color = gradient.Evaluate(Mathf.InverseLerp(reclaimMinMax.x, reclaimMinMax.y, amount));
         }
     }

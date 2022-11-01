@@ -218,7 +218,6 @@ GameObject:
   - component: {fileID: 7634054201000015619}
   - component: {fileID: 6439419821570432660}
   - component: {fileID: 6696386017978103549}
-  - component: {fileID: 2175531939623175081}
   - component: {fileID: 1293692952763402599}
   - component: {fileID: 4952269660437515389}
   - component: {fileID: 7772815985065370233}
@@ -262,12 +261,12 @@ MonoBehaviour:
     NumStackedVectorObservations: 1
     m_ActionSpec:
       m_NumContinuousActions: 3
-      BranchSizes: 0400000002000000
+      BranchSizes: 0500000002000000
     VectorActionSize: 
     VectorActionDescriptions: []
     VectorActionSpaceType: 0
     hasUpgradedBrainParametersWithActionSpec: 1
-  m_Model: {fileID: 5022602860645237092, guid: 9130b407a5b0e4f41b55ba898732e9ef, type: 3}
+  m_Model: {fileID: 0}
   m_InferenceDevice: 2
   m_BehaviorType: 0
   m_BehaviorName: Clicker
@@ -306,27 +305,16 @@ MonoBehaviour:
   startingUnitTemplate: {fileID: 11400000, guid: 7a81450c883149b4f8194f72f5504815, type: 2}
   numStartingUnits: 5
   startingUnitSpread: 20
-  zoomSpeed: 30
+  zoomSpeed: 10
+  cameraMovementBorderPercentage: 0.2
+  cameraPanningSpeed: 25
   zoomMinMax: {x: 10, y: 100}
-  writeHeuristic: 0
-  drawBufferSensorMonitor: 0
+  decisionTimeMinMax: {x: 0, y: 100}
   interactableLayerMask:
     serializedVersion: 2
     m_Bits: 64
---- !u!114 &2175531939623175081
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4799327343366791544}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 27ca2d0529f8c7545bc4bd53692786d3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  decisionPeriod: 50
-  takeActionsBetweenDecisions: 0
+  isHuman: 1
+  drawBufferSensorMonitor: 0
 --- !u!114 &1293692952763402599
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -379,7 +367,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4799327343366791544}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f2902496c0120472b90269f94a0aec7e, type: 3}
   m_Name: 
@@ -404,7 +392,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &6052563030240584686
 Transform:
   m_ObjectHideFlags: 0
@@ -413,7 +401,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4875339125753126977}
   m_LocalRotation: {x: 0.7071068, y: -0, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 10, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 2723807228034373449}

@@ -52,7 +52,8 @@ MonoBehaviour:
   numGaussianReclaim: 50
   agents:
   - {fileID: 6073555764631712557}
-  timeToReset: 60
+  timeWhenReset: 50
+  timeSinceReset: 0
 --- !u!1001 &623692831023433168
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -71,6 +72,10 @@ PrefabInstance:
     - target: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
       propertyPath: halfGroundSize
       value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
+      propertyPath: meanDecisionTime
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
       propertyPath: environmentController

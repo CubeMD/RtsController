@@ -19,7 +19,7 @@ public class Environment : MonoBehaviour
     [Header("Agents")]
     [SerializeField] private List<RtsAgent> agents;
     
-    public float timeToReset;
+    public float timeWhenReset;
     public float timeSinceReset;
 
     private void Awake()
@@ -45,7 +45,7 @@ public class Environment : MonoBehaviour
     {
         timeSinceReset += Time.deltaTime;
         
-        if (timeSinceReset >= timeToReset)
+        if (timeSinceReset >= timeWhenReset)
         {
             ResetEnvironment();
         }
