@@ -1,13 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using AgentDebugTool.Scripts.Agent;
 using Systems.Interfaces;
 using Systems.Orders;
 using Templates;
 using Tools;
-using Unity.Mathematics;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
@@ -17,7 +14,6 @@ using UnityEditor;
 #endif
 
 using UnityEngine;
-using UnityEngine.UIElements;
 using Cursor = UnityEngine.Cursor;
 using Random = UnityEngine.Random;
 
@@ -84,13 +80,6 @@ public class RtsAgent : DebuggableAgent
     [SerializeField] private bool isHuman;
     [SerializeField] private bool drawBufferSensorMonitor;
     
-    private readonly List<Unit> ownedUnits = new List<Unit>();
-    private readonly List<Unit> selectedUnits = new List<Unit>();
-    
-    private RtsAgentAction completedRtsAgentAction;
-    private float timeSinceLastDecision;
-    private Vector3 accumulatedCameraOffset;
-
     private float CameraZoom
     {
         get => cam.orthographicSize;
@@ -104,6 +93,15 @@ public class RtsAgent : DebuggableAgent
     }
 
     private float MapSize => environment.halfGroundSize;
+    private Vector3 CursorLocalPosition => cursorTransform.localPosition;
+    private Vector3 CameraLocalPosition => cameraTransform.localPosition;
+    
+    private readonly List<Unit> ownedUnits = new List<Unit>();
+    private readonly List<Unit> selectedUnits = new List<Unit>();
+    
+    private RtsAgentAction completedRtsAgentAction;
+    private float timeSinceLastDecision;
+    private Vector3 accumulatedCameraOffset;
     
     private void Awake()
     {
@@ -138,7 +136,13 @@ public class RtsAgent : DebuggableAgent
         {
             timeSinceLastDecision += Time.fixedDeltaTime;
             
-            if (completedRtsAgentAction == null || timeSinceLastDecision >= completedRtsAgentAction.timeForScheduledDecision)
+            if (completedRtsAgentAction == null)
+            {
+                completedRtsAgentAction = new RtsAgentAction();
+                timeSinceLastDecision = 0;
+                RequestDecision();
+            }
+            else if (timeSinceLastDecision >= completedRtsAgentAction.timeForScheduledDecision)
             {
                 timeSinceLastDecision = 0;
                 RequestDecision();
@@ -190,27 +194,21 @@ public class RtsAgent : DebuggableAgent
         if (!isHuman || 
             !Application.isFocused ||
             completedRtsAgentAction != null ||
-            Input.mousePosition.x < 0 ||
-            Input.mousePosition.x > 1000 ||
-            Input.mousePosition.y < 0 ||
-            Input.mousePosition.y > 1000) return;
+            IsMouseOutOfScreen()) return;
 
         timeSinceLastDecision += Time.deltaTime;
         
         Vector3 humanCursorPositionRelativeToCamera = cameraTransform.InverseTransformPoint(cam.ScreenToWorldPoint(Input.mousePosition));
-
         float startCameraMovementDistance = CameraZoom * (1 - cameraMovementBorderPercentage);
 
         Vector3 cameraOffsetDirection = Vector3.zero;
         
-        if (humanCursorPositionRelativeToCamera.x >= startCameraMovementDistance || 
-            humanCursorPositionRelativeToCamera.x <= -startCameraMovementDistance)
+        if (IsAxisOutOfCameraMovementThreshold(humanCursorPositionRelativeToCamera.x, startCameraMovementDistance))
         {
             cameraOffsetDirection += Vector3.right * Mathf.Sign(humanCursorPositionRelativeToCamera.x);
         }
         
-        if (humanCursorPositionRelativeToCamera.z >= startCameraMovementDistance ||
-            humanCursorPositionRelativeToCamera.z <= -startCameraMovementDistance)
+        if (IsAxisOutOfCameraMovementThreshold(humanCursorPositionRelativeToCamera.z, startCameraMovementDistance))
         {
             cameraOffsetDirection += Vector3.forward * Mathf.Sign(humanCursorPositionRelativeToCamera.z);
         }
@@ -227,12 +225,11 @@ public class RtsAgent : DebuggableAgent
             else
             {
                 Vector3 cameraOffset = cameraOffsetDirection.normalized * (cameraPanningSpeed * Time.deltaTime * zoomSpeed / zoomMinMax.x);
-            
                 Vector3 cameraOffsetCorrected = new Vector3(
-                    Mathf.Clamp(cameraOffset.x, Mathf.Max(-MapSize - cameraTransform.localPosition.x + CameraZoom, cursorTransform.localPosition.x - CameraZoom), Mathf.Min(MapSize - cameraTransform.localPosition.x - CameraZoom, cursorTransform.localPosition.x + CameraZoom)),
+                    GetClampedCameraOffset(cameraOffset.x, CameraLocalPosition.x, CursorLocalPosition.x),
                     0f,
-                    Mathf.Clamp(cameraOffset.z, Mathf.Max(-MapSize - cameraTransform.localPosition.z + CameraZoom, cursorTransform.localPosition.z - CameraZoom), Mathf.Min(MapSize - cameraTransform.localPosition.z - CameraZoom, cursorTransform.localPosition.z + CameraZoom)));
-            
+                    GetClampedCameraOffset(cameraOffset.z, CameraLocalPosition.z, CursorLocalPosition.z));
+
                 Vector3 correction = cameraOffsetCorrected - cameraOffset;
                 
                 if (Mathf.Abs(correction.x) > 0 || Mathf.Abs(correction.z) > 0)
@@ -289,9 +286,7 @@ public class RtsAgent : DebuggableAgent
             if (completedRtsAgentAction.currentAgentActionType == AgentActionType.None && 
                 accumulatedCameraOffset != Vector3.zero)
             {
-                Vector3 totalHumanCursorOffset =
-                    accumulatedCameraOffset - cursorTransform.localPosition;
-
+                Vector3 totalHumanCursorOffset = accumulatedCameraOffset - CursorLocalPosition;
                 completedRtsAgentAction.currentCursorAction = new Vector2(
                     Mathf.Clamp(totalHumanCursorOffset.x / CameraZoom / 2, -1f, 1), 
                     Mathf.Clamp(totalHumanCursorOffset.z / CameraZoom / 2, -1f, 1));
@@ -302,20 +297,17 @@ public class RtsAgent : DebuggableAgent
 
                 if (accumulatedCameraOffset != Vector3.zero)
                 {
-                    Debug.Log("accumulated offset with wrong action type");
+                    Debug.LogError($"Accumulated offset with wrong action type: {completedRtsAgentAction.currentAgentActionType.ToString()}");
                 }
                 
                 completedRtsAgentAction.currentCursorAction = new Vector2(
                     Mathf.Clamp(humanCursorPositionRelativeToCursor.x / CameraZoom / 2, -1f, 1), 
                     Mathf.Clamp(humanCursorPositionRelativeToCursor.z / CameraZoom / 2, -1f, 1));
             }
-
-
-
-
+            
             cameraTransform.localPosition -= accumulatedCameraOffset;
             cursorTransform.localPosition += accumulatedCameraOffset;
-            Debug.Log($"after reset cameraTransform.localPosition {cameraTransform.localPosition}, cursorTransform.localPosition {cursorTransform.localPosition}");
+            //Debug.Log($"after reset cameraTransform.localPosition {cameraTransform.localPosition}, cursorTransform.localPosition {cursorLocalPosition}");
             
             completedRtsAgentAction.timeForScheduledDecision = timeSinceLastDecision;
             timeSinceLastDecision = 0;
@@ -331,6 +323,26 @@ public class RtsAgent : DebuggableAgent
             InteractWithEnvironment(completedRtsAgentAction);
         }
     }
+
+    private float GetClampedCameraOffset(float value, float cameraAxisPosition, float cursorAxisPosition)
+    {
+        return Mathf.Clamp(value,
+            Mathf.Max(-MapSize - cameraAxisPosition + CameraZoom, cursorAxisPosition - CameraZoom),
+            Mathf.Min(MapSize - cameraAxisPosition - CameraZoom, cursorAxisPosition + CameraZoom));
+    }
+    
+    private bool IsMouseOutOfScreen()
+    {
+        return Input.mousePosition.x < 0 ||
+               Input.mousePosition.x > 1000 ||
+               Input.mousePosition.y < 0 ||
+               Input.mousePosition.y > 1000;
+    }
+
+    private bool IsAxisOutOfCameraMovementThreshold(float axisPosition, float threshold)
+    {
+        return axisPosition >= threshold || axisPosition <= -threshold;
+    }
     
     public override void Heuristic(in ActionBuffers actionsOut)
     {
@@ -339,14 +351,12 @@ public class RtsAgent : DebuggableAgent
         
         continuousActions[0] = completedRtsAgentAction.currentCursorAction.x;
         continuousActions[1] = completedRtsAgentAction.currentCursorAction.y;
-        continuousActions[2] = Mathf.InverseLerp(decisionTimeMinMax.x, decisionTimeMinMax.y, completedRtsAgentAction.timeForScheduledDecision);
+        continuousActions[2] = Mathf.InverseLerp(decisionTimeMinMax.x, decisionTimeMinMax.y, completedRtsAgentAction.timeForScheduledDecision) + 1 / 2f;
         
         discreteActions[0] = (int)completedRtsAgentAction.currentAgentActionType;
         discreteActions[1] = completedRtsAgentAction.currentShiftAction ? 1 : 0;
 
         completedRtsAgentAction = null;
-
-        //Debug.Log($"Heuristic. Decide val {continuousActions[3]}");
     }
     
     public override void CollectObservations(VectorSensor sensor)
@@ -460,7 +470,9 @@ public class RtsAgent : DebuggableAgent
         if (!isHuman)
         {
             float timeForScheduledDecision = Mathf.Lerp(decisionTimeMinMax.x, decisionTimeMinMax.y, (currentDelayAction + 1 ) / 2);
-            InteractWithEnvironment(new RtsAgentAction(currentCursorAction, timeForScheduledDecision, currentAgentActionType, currentShiftAction));
+            completedRtsAgentAction = new RtsAgentAction(currentCursorAction, timeForScheduledDecision,
+                currentAgentActionType, currentShiftAction);
+            InteractWithEnvironment(completedRtsAgentAction);
         }
         else
         {

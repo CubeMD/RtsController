@@ -304,16 +304,16 @@ MonoBehaviour:
   unitPrefab: {fileID: 5783598507208318217, guid: cd3ee9b1e21424d40aee4acf19d8bc4e, type: 3}
   startingUnitTemplate: {fileID: 11400000, guid: 7a81450c883149b4f8194f72f5504815, type: 2}
   numStartingUnits: 5
-  startingUnitSpread: 20
+  startingUnitSpread: 25
   zoomSpeed: 10
-  cameraMovementBorderPercentage: 0.2
-  cameraPanningSpeed: 25
+  cameraMovementBorderPercentage: 0.01
+  cameraPanningSpeed: 75
   zoomMinMax: {x: 10, y: 100}
-  decisionTimeMinMax: {x: 0, y: 100}
+  decisionTimeMinMax: {x: 0, y: 10}
   interactableLayerMask:
     serializedVersion: 2
     m_Bits: 64
-  isHuman: 1
+  isHuman: 0
   drawBufferSensorMonitor: 0
 --- !u!114 &1293692952763402599
 MonoBehaviour:
@@ -367,14 +367,14 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4799327343366791544}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f2902496c0120472b90269f94a0aec7e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   Record: 0
   NumStepsToRecord: 0
-  DemonstrationName: Test
+  DemonstrationName: 1
   DemonstrationDirectory: D:\
 --- !u!1 &4875339125753126977
 GameObject:

@@ -47,12 +47,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   halfGroundSize: 0
   ground: {fileID: 8490167346486103102}
-  reclaimMinMax: {x: 0, y: 10}
+  reclaimMinMax: {x: 0, y: 20}
   reclaimPrefab: {fileID: 4320805846232463114, guid: d59ec32ab969a14488fdc4a22182d668, type: 3}
-  numGaussianReclaim: 50
+  numGaussianReclaim: 75
   agents:
   - {fileID: 6073555764631712557}
-  timeWhenReset: 50
+  timeWhenReset: 60
   timeSinceReset: 0
 --- !u!1001 &623692831023433168
 PrefabInstance:
@@ -76,6 +76,10 @@ PrefabInstance:
     - target: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
       propertyPath: meanDecisionTime
       value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
+      propertyPath: numStartingUnits
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
       propertyPath: environmentController
