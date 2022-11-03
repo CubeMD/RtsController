@@ -23,9 +23,7 @@ public class RtsAgent : DebuggableAgent
     {
         None = 0,
         LeftDrag = 1,
-        RightClick = 2,
-        ZoomIn = 3,
-        ZoomOut = 4
+        RightClick = 2
     }
     
     private class RtsAgentAction
@@ -34,12 +32,14 @@ public class RtsAgent : DebuggableAgent
         public float timeForScheduledDecision;
         public AgentActionType currentAgentActionType;
         public bool currentShiftAction;
-        public RtsAgentAction(Vector2 currentCursorAction, float timeForScheduledDecision, AgentActionType currentAgentActionType, bool currentShiftAction)
+        public int currentZoomAction;
+        public RtsAgentAction(Vector2 currentCursorAction, float timeForScheduledDecision, AgentActionType currentAgentActionType, bool currentShiftAction, int currentZoomAction)
         {
             this.currentCursorAction = currentCursorAction;
             this.timeForScheduledDecision = timeForScheduledDecision;
             this.currentAgentActionType = currentAgentActionType;
             this.currentShiftAction = currentShiftAction;
+            this.currentZoomAction = currentZoomAction;
         }
 
         public RtsAgentAction()
@@ -256,7 +256,7 @@ public class RtsAgent : DebuggableAgent
         {
             completedRtsAgentAction ??= new RtsAgentAction
             {
-                currentAgentActionType = -Input.mouseScrollDelta.y < 0 ? AgentActionType.ZoomOut : AgentActionType.ZoomIn
+                //currentAgentActionType = -Input.mouseScrollDelta.y < 0 ? AgentActionType.ZoomOut : AgentActionType.ZoomIn
             };
         }
         else if (Input.GetKeyDown(KeyCode.Mouse0))
@@ -461,17 +461,24 @@ public class RtsAgent : DebuggableAgent
 
         AgentActionType currentAgentActionType = (AgentActionType)discreteActions[0];
         bool currentShiftAction = discreteActions[1] == 1;
-        
+
+        int currentZoomAction = discreteActions[2] - 1;
+
+        float pos = cursorTransform.localPosition.magnitude / CameraZoom;
+        float posCam = cameraTransform.localPosition.magnitude / CameraZoom ;
+
         // Regularize continuous actions
-        AddReward(-0.01f * environment.timeSinceReset / environment.timeWhenReset);
-        //AddReward(-0.01f * (currentCursorAction.magnitude * currentCursorAction.magnitude / 4f));
-        //AddReward(-0.01f * (currentZoomAction * currentZoomAction));
+        AddReward(-0.005f);
+        AddReward(-0.005f * currentCursorAction.magnitude);
+        AddReward(-0.005f * pos);
+        AddReward(-0.005f * posCam);
+        AddReward(discreteActions[2] != 1 ? -0.01f : 0f);
         
         if (!isHuman)
         {
             float timeForScheduledDecision = Mathf.Lerp(decisionTimeMinMax.x, decisionTimeMinMax.y, (currentDelayAction + 1 ) / 2);
             completedRtsAgentAction = new RtsAgentAction(currentCursorAction, timeForScheduledDecision,
-                currentAgentActionType, currentShiftAction);
+                currentAgentActionType, currentShiftAction, currentZoomAction);
             InteractWithEnvironment(completedRtsAgentAction);
         }
         else
@@ -502,16 +509,10 @@ public class RtsAgent : DebuggableAgent
         cursorTransform.localPosition += clampedCursorOffset;
         
         //Zoom camera and correct mouse
-        int currentZoomOffsetAction = rtsAgentAction.currentAgentActionType switch
-        {
-            AgentActionType.ZoomIn => 1,
-            AgentActionType.ZoomOut => -1,
-            _ => 0
-        };
         
-        if (currentZoomOffsetAction != 0)
+        if (rtsAgentAction.currentZoomAction != 0)
         {
-            float clampedZoomOffset = Mathf.Clamp(currentZoomOffsetAction * zoomSpeed, zoomMinMax.x - CameraZoom, zoomMinMax.y - CameraZoom);
+            float clampedZoomOffset = Mathf.Clamp(rtsAgentAction.currentZoomAction * zoomSpeed, zoomMinMax.x - CameraZoom, zoomMinMax.y - CameraZoom);
 
             if (clampedZoomOffset < 0)
             {

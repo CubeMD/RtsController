@@ -56,6 +56,7 @@ public class Environment : MonoBehaviour
         OnEnvironmentReset?.Invoke();
         timeSinceReset = 0;
         SpawnStartingReclaim();
+        Resources.UnloadUnusedAssets();
     }
 
     public void SpawnStartingReclaim()
