@@ -101,7 +101,7 @@ namespace Tools
         /// <param name="prefab">Prefab to instantiate</param>
         /// <param name="parent">Transform the instantiated object will be a child of</param>
         /// <returns>Returns the instantiated prefab</returns>
-        public new static T InstantiateGameObject<T>(T prefab, Transform parent) where T : Object
+        public static T InstantiateGameObject<T>(T prefab, Transform parent) where T : Object
         {
             GameObject gameObj = prefab is Component component ? component.gameObject : (prefab as GameObject);
 
