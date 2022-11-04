@@ -183,7 +183,7 @@ public class RtsAgent : DebuggableAgent
 
     private void SpawnUnit(UnitTemplate unitTemplate, Vector3 localPosition)
     {
-        Unit unit = Instantiate(unitPrefab, transform.parent.localPosition + localPosition, Quaternion.identity, transform.parent);
+        Unit unit = ObjectPooler.InstantiateGameObject(unitPrefab, transform.parent.localPosition + localPosition, Quaternion.identity, transform.parent);
         unit.SetUnitTemplate(unitTemplate, this);
         unit.OnDestroyableDestroy += HandleUnitDestroyed;
         ownedUnits.Add(unit);
@@ -595,7 +595,7 @@ public class RtsAgent : DebuggableAgent
 
         if (capableUnits.Count < 1) return;
         
-        Order order = Instantiate(orderPrefab, groundHitPosition, Quaternion.identity, transform.parent);
+        Order order = ObjectPooler.InstantiateGameObject(orderPrefab, groundHitPosition, Quaternion.identity, transform.parent);
 
         order.SetOrder(hitInfo.transform, orderType, capableUnits, groundOrder, groundHitPosition, this, additive);
     }

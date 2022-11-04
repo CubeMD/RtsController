@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace AgentDebugTool.Scripts
 {
-    public class TimeScaleUtility : Singleton<TimeScaleUtility>
+    public class TimeScaleUtility : Tools.Singleton<TimeScaleUtility>
     {
         private const float TIMESCALE_UPPER_LIMIT = 100f;
         public static event Action<TimeScaleUtility, float> OnTimescaleChanged;

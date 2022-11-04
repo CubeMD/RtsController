@@ -1,5 +1,6 @@
 using System;
 using Systems.Interfaces;
+using Tools;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -80,6 +81,6 @@ public class Reclaim : MonoBehaviour, IDestroyable
     {
         OnDestroyableDestroy?.Invoke(this);
         environment.OnEnvironmentReset -= HandleEnvironmentReset;
-        Destroy(gameObject);
+        ObjectPooler.PoolGameObject(gameObject);
     }
 }

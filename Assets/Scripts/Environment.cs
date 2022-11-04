@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Tools;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -67,8 +68,8 @@ public class Environment : MonoBehaviour
                 Random.Range(-halfGroundSize, halfGroundSize),
                 0,
                 Random.Range(-halfGroundSize, halfGroundSize));
-
-            Reclaim reclaim = Instantiate(reclaimPrefab, transform.localPosition + localPosition, Quaternion.identity, transform);
+            
+            Reclaim reclaim = ObjectPooler.InstantiateGameObject(reclaimPrefab, transform.localPosition + localPosition, Quaternion.identity, transform);
             reclaim.SetEnvironment(this);
             reclaim.SetRandomGaussianAmount(reclaimMinMax);
         }

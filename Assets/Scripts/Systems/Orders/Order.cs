@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Systems.Interfaces;
+using Tools;
 using UnityEngine;
 
 namespace Systems.Orders
@@ -57,16 +58,16 @@ namespace Systems.Orders
 
             if (assignedUnits.Count < 1)
             {
-                Destroy(gameObject);
+                ObjectPooler.PoolGameObject(gameObject);
             }
         }
 
         private void HandleOrderDependencyDestroyed(IDestroyable destroyable)
         {
-            Destroy(gameObject);
+            ObjectPooler.PoolGameObject(gameObject);
         }
         
-        private void OnDestroy()
+        private void OnDisable()
         {
             if (destroyable != null)
             {

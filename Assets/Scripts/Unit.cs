@@ -6,6 +6,7 @@ using Systems.Modules;
 using Systems.Orders;
 using Templates;
 using Templates.Modules;
+using Tools;
 using UnityEngine;
 
 public class Unit : MonoBehaviour, IDestroyable
@@ -22,7 +23,7 @@ public class Unit : MonoBehaviour, IDestroyable
     private readonly Dictionary<OrderType, List<OrderExecutionModule>> orderTypeExecutionModulesTable 
         = new Dictionary<OrderType, List<OrderExecutionModule>>();
 
-    private void OnDestroy()
+    private void OnDisable()
     {
         OnDestroyableDestroy?.Invoke(this);
 
@@ -171,7 +172,7 @@ public class Unit : MonoBehaviour, IDestroyable
     private void HandleEnvironmentReset()
     {
         environment.OnEnvironmentReset -= HandleEnvironmentReset;
-        Destroy(gameObject);
+        ObjectPooler.PoolGameObject(gameObject);
     }
     
     public GameObject GetGameObject()

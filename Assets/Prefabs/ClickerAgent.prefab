@@ -309,7 +309,7 @@ MonoBehaviour:
   cameraMovementBorderPercentage: 0.01
   cameraPanningSpeed: 75
   zoomMinMax: {x: 20, y: 100}
-  decisionTimeMinMax: {x: 0.5, y: 5}
+  decisionTimeMinMax: {x: 0.1, y: 5}
   interactableLayerMask:
     serializedVersion: 2
     m_Bits: 64
