@@ -309,7 +309,7 @@ MonoBehaviour:
   cameraMovementBorderPercentage: 0.01
   cameraPanningSpeed: 75
   zoomMinMax: {x: 20, y: 100}
-  decisionTimeMinMax: {x: 0.1, y: 5}
+  decisionTimeMinMax: {x: 0.1, y: 0.11}
   interactableLayerMask:
     serializedVersion: 2
     m_Bits: 64
@@ -329,7 +329,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_SensorName: ReclaimSensor
   m_ObservableSize: 3
-  m_MaxNumObservables: 50
+  m_MaxNumObservables: 75
 --- !u!114 &4952269660437515389
 MonoBehaviour:
   m_ObjectHideFlags: 0

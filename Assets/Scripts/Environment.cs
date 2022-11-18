@@ -42,9 +42,9 @@ public class Environment : MonoBehaviour
         }
     }
 
-    public void Update()
+    public void FixedUpdate()
     {
-        timeSinceReset += Time.deltaTime;
+        timeSinceReset += Time.fixedDeltaTime;
         
         if (timeSinceReset >= timeWhenReset)
         {
@@ -57,7 +57,6 @@ public class Environment : MonoBehaviour
         OnEnvironmentReset?.Invoke();
         timeSinceReset = 0;
         SpawnStartingReclaim();
-        Resources.UnloadUnusedAssets();
     }
 
     public void SpawnStartingReclaim()

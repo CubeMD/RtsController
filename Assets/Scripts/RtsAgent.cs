@@ -26,7 +26,7 @@ public class RtsAgent : DebuggableAgent
         RightClick = 2
     }
     
-    private class RtsAgentAction
+    public class RtsAgentAction
     {
         public Vector2 currentCursorAction;
         public float timeForScheduledDecision;
@@ -45,6 +45,32 @@ public class RtsAgent : DebuggableAgent
         public RtsAgentAction()
         {
             
+        }
+    }
+    
+    public class RtsAgentObservation
+    {
+        public float[] vectorObservations;
+        public List<List<float[]>> observations;
+            
+        public RtsAgentObservation(float[] vectorObservations, List<List<float[]>> observations)
+        {
+            this.vectorObservations = vectorObservations;
+            this.observations = observations;
+        }
+    }
+
+    public class AgentStep
+    {
+        public RtsAgentAction rtsAgentAction;
+        public RtsAgentObservation rtsAgentObservation;
+        public float reward;
+
+        public AgentStep(RtsAgentObservation rtsAgentObservation, RtsAgentAction rtsAgentAction, float reward)
+        {
+            this.rtsAgentObservation = rtsAgentObservation;
+            this.rtsAgentAction = rtsAgentAction;
+            this.reward = reward;
         }
     }
     
@@ -73,7 +99,7 @@ public class RtsAgent : DebuggableAgent
     [SerializeField] private float cameraMovementBorderPercentage;
     [SerializeField] private float cameraPanningSpeed;
     [SerializeField] private Vector2 zoomMinMax;
-    [SerializeField] private Vector2 decisionTimeMinMax;
+    [SerializeField] private Vector3 minMeanMaxActionDelay;
     [SerializeField] private LayerMask interactableLayerMask;
 
     [Header("Extra")]
@@ -102,52 +128,17 @@ public class RtsAgent : DebuggableAgent
     private RtsAgentAction completedRtsAgentAction;
     private float timeSinceLastDecision;
     private Vector3 accumulatedCameraOffset;
+    private readonly List<AgentStep> episodeTrajectory = new List<AgentStep>();
     
-    private void Awake()
+    public override void Initialize()
     {
-        if (isHuman)
-        {
-#if UNITY_EDITOR
-            EditorApplication.ExecuteMenuItem("Window/General/Game");
-#endif
-            Cursor.lockState = CursorLockMode.Confined;
-        }
-
-        Academy.Instance.AgentPreStep += MakeRequests;
-    }
-
-    protected override void OnDestroy()
-    {
-        base.OnDestroy();
-        
-        if (Academy.IsInitialized)
-        {
-            Academy.Instance.AgentPreStep -= MakeRequests;
-        }
-    }
-    
-    private void MakeRequests(int academyStepCount)
-    {
-        if (isHuman && completedRtsAgentAction != null)
-        {
-            RequestDecision();
-        }
-        else if (!isHuman)
-        {
-            timeSinceLastDecision += Time.fixedDeltaTime;
+        Academy.Instance.AutomaticSteppingEnabled = false;
             
-            if (completedRtsAgentAction == null)
-            {
-                completedRtsAgentAction = new RtsAgentAction();
-                timeSinceLastDecision = 0;
-                RequestDecision();
-            }
-            else if (timeSinceLastDecision >= completedRtsAgentAction.timeForScheduledDecision)
-            {
-                timeSinceLastDecision = 0;
-                RequestDecision();
-            }
-        }
+    }
+    
+    public void Start()
+    {
+        Academy.Instance.EnvironmentStep();
     }
 
     public override void OnEpisodeBegin()
@@ -187,6 +178,33 @@ public class RtsAgent : DebuggableAgent
         unit.SetUnitTemplate(unitTemplate, this);
         unit.OnDestroyableDestroy += HandleUnitDestroyed;
         ownedUnits.Add(unit);
+    }
+    
+    public void FixedUpdate()
+    {
+        timeSinceLastDecision += Time.fixedDeltaTime;
+            
+        if (isHuman)
+        {
+            if (timeSinceLastDecision >= minMeanMaxActionDelay.z || completedRtsAgentAction.timeForScheduledDecision != 0)
+            {
+                completedRtsAgentAction.timeForScheduledDecision = timeSinceLastDecision;
+                episodeTrajectory.Add(new AgentStep(GetAgentEnvironmentObservation(), completedRtsAgentAction, 0));
+                timeSinceLastDecision = 0;
+                completedRtsAgentAction = new RtsAgentAction(Vector2.zero, 0, AgentActionType.None, false, 0);
+                InteractWithEnvironment(completedRtsAgentAction);
+            }
+        }
+        else if (!isHuman)
+        {
+            if (timeSinceLastDecision >= completedRtsAgentAction.timeForScheduledDecision)
+            {
+                timeSinceLastDecision = 0;
+                RequestDecision();
+                Academy.Instance.EnvironmentStep();
+                InteractWithEnvironment(completedRtsAgentAction);
+            }
+        }
     }
     
     private void Update()
@@ -351,37 +369,50 @@ public class RtsAgent : DebuggableAgent
         
         continuousActions[0] = completedRtsAgentAction.currentCursorAction.x;
         continuousActions[1] = completedRtsAgentAction.currentCursorAction.y;
-        continuousActions[2] = Mathf.InverseLerp(decisionTimeMinMax.x, decisionTimeMinMax.y, completedRtsAgentAction.timeForScheduledDecision) + 1 / 2f;
+        continuousActions[2] = Mathf.InverseLerp(minMeanMaxActionDelay.x, minMeanMaxActionDelay.y, completedRtsAgentAction.timeForScheduledDecision) + 1 / 2f;
         
         discreteActions[0] = (int)completedRtsAgentAction.currentAgentActionType;
         discreteActions[1] = completedRtsAgentAction.currentShiftAction ? 1 : 0;
 
         completedRtsAgentAction = null;
     }
-    
-    public override void CollectObservations(VectorSensor sensor)
+
+    public RtsAgentObservation GetAgentEnvironmentObservation()
     {
         Monitor.RemoveAllValuesFromAllTransforms();
-        
-        Vector3 camRelNormPos = cursorTransform.InverseTransformPoint(cameraTransform.position) / CameraZoom;
-        Vector2 camPosObservation = new Vector2(camRelNormPos.x, camRelNormPos.z);
-        sensor.AddObservation(camPosObservation);
-        observationsDebugSet.Add("Cam Pos", $"{camPosObservation}");
-        
-        Vector2 cursorPosObservation =  new Vector2(
-            (cameraTransform.localPosition.x + cursorTransform.localPosition.x) / MapSize, 
-            (cameraTransform.localPosition.z + cursorTransform.localPosition.z) / MapSize);
-        sensor.AddObservation(cursorPosObservation);
-        observationsDebugSet.Add("Cursor Pos", $"{cursorPosObservation}");
-        
-        float zoomObservation = Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom);
-        sensor.AddObservation(zoomObservation);
-        observationsDebugSet.Add("Zoom", $"{zoomObservation}");
-        
-        float time = environment.timeSinceReset / environment.timeWhenReset;
-        sensor.AddObservation(time);
-        observationsDebugSet.Add("Time", $"{time}");
 
+        Vector3 camRelNormPos = cursorTransform.InverseTransformPoint(cameraTransform.position) / CameraZoom;
+        Vector3 cursorPosObservation = (cameraTransform.localPosition + cursorTransform.localPosition) / MapSize;
+        float zoomObservation = Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom);
+        float time = environment.timeSinceReset / environment.timeWhenReset;
+        float timeSinceDecision = timeSinceLastDecision / minMeanMaxActionDelay.z;
+        
+        float[] vectorObservations =
+        {
+            camRelNormPos.x,
+            camRelNormPos.z,
+            cursorPosObservation.x,
+            cursorPosObservation.z,
+            zoomObservation,
+            time,
+            timeSinceDecision 
+        };
+        
+        observationsDebugSet.Add("Cam Pos X", $"{camRelNormPos.x}");
+        observationsDebugSet.Add("Cam Pos Z", $"{camRelNormPos.z}");
+        
+        observationsDebugSet.Add("Cursor Pos X", $"{cursorPosObservation.x}");
+        observationsDebugSet.Add("Cursor Pos Z", $"{cursorPosObservation.z}");
+        
+        observationsDebugSet.Add("Zoom", $"{zoomObservation}");
+        observationsDebugSet.Add("Time", $"{time}");
+        observationsDebugSet.Add("Time Since Decision", $"{timeSinceDecision}");
+
+        List<List<float[]>> observations = new List<List<float[]>>();
+        observations.Add(new List<float[]>());
+        observations.Add(new List<float[]>());
+        observations.Add(new List<float[]>());
+        
         foreach (Collider collider in Physics.OverlapBox(cameraTransform.position, Vector3.one * CameraZoom, Quaternion.identity, interactableLayerMask))
         {
             Vector3 relNormPos = cursorTransform.InverseTransformPoint(collider.transform.position) / MapSize;
@@ -395,11 +426,10 @@ public class RtsAgent : DebuggableAgent
             if (collider.TryGetComponent(out Reclaim reclaim))
             {
                 interactableObservation.Add(reclaim.Amount);
-                reclaimSensorComponent.AppendObservation(interactableObservation.ToArray());
+                observations[0].Add(interactableObservation.ToArray());
                 
                 if (drawBufferSensorMonitor)
                 {
-
                     Monitor.Log("Data: ", string.Join(" ", interactableObservation), collider.transform);
                     Monitor.Log("Type: ", "Reclaim", collider.transform);
                 }
@@ -407,7 +437,7 @@ public class RtsAgent : DebuggableAgent
             else if (collider.TryGetComponent(out Unit unit))
             {
                 interactableObservation.Add(selectedUnits.Contains(unit) ? 1 : -1);
-                unitSensorComponent.AppendObservation(interactableObservation.ToArray());
+                observations[1].Add(interactableObservation.ToArray());
                 
                 if (drawBufferSensorMonitor)
                 {
@@ -439,12 +469,39 @@ public class RtsAgent : DebuggableAgent
                         Monitor.Log("Type: ", "Order", order.transform);
                     }
 
-                    orderSensorComponent.AppendObservation(orderObservation.ToArray());
+                    observations[2].Add(orderObservation.ToArray());
                 }
             }
         }
         //Debug.Log($"Obs. environment.timeSinceReset at {environment.timeSinceReset}, agent time since decision {timeSinceDecision}");
         BroadcastObservationsCollected();
+        
+        return new RtsAgentObservation(vectorObservations, observations);
+    }
+    
+    public override void CollectObservations(VectorSensor sensor)
+    {
+        RtsAgentObservation rtsAgentObservation = isHuman ? episodeTrajectory[0].rtsAgentObservation : GetAgentEnvironmentObservation();
+            
+        foreach (float observation in rtsAgentObservation.vectorObservations)
+        {
+            sensor.AddObservation(observation);
+        }
+
+        foreach (float[] objectObservation in rtsAgentObservation.observations[0])     
+        {
+            reclaimSensorComponent.AppendObservation(objectObservation);
+        }
+        
+        foreach (float[] objectObservation in rtsAgentObservation.observations[1])     
+        {
+            unitSensorComponent.AppendObservation(objectObservation);
+        }
+        
+        foreach (float[] objectObservation in rtsAgentObservation.observations[2])     
+        {
+            orderSensorComponent.AppendObservation(objectObservation);
+        }
     }
 
     public override void OnActionReceived(ActionBuffers actions)
@@ -465,27 +522,20 @@ public class RtsAgent : DebuggableAgent
         int currentZoomAction = discreteActions[2] - 1;
 
         float pos = cursorTransform.localPosition.magnitude / CameraZoom;
-        float posCam = cameraTransform.localPosition.magnitude / CameraZoom ;
+        float posCam = cameraTransform.localPosition.magnitude / CameraZoom;
 
         // Regularize continuous actions
         AddReward(-0.005f);
         AddReward(-0.005f * currentCursorAction.magnitude);
         AddReward(-0.005f * pos);
         AddReward(-0.005f * posCam);
-        AddReward(discreteActions[2] != 1 ? -0.01f : 0f);
+        AddReward(currentZoomAction != 0 ? -0.01f : 0f);
         
         if (!isHuman)
         {
-            float timeForScheduledDecision = Mathf.Lerp(decisionTimeMinMax.x, decisionTimeMinMax.y, (currentDelayAction + 1 ) / 2);
-            completedRtsAgentAction = new RtsAgentAction(currentCursorAction, timeForScheduledDecision,
-                currentAgentActionType, currentShiftAction, currentZoomAction);
-            InteractWithEnvironment(completedRtsAgentAction);
+            float timeForScheduledDecision = Mathf.Lerp(minMeanMaxActionDelay.x, minMeanMaxActionDelay.y, (currentDelayAction + 1 ) / 2);
+            completedRtsAgentAction = new RtsAgentAction(currentCursorAction, timeForScheduledDecision, currentAgentActionType, currentShiftAction, currentZoomAction);
         }
-        else
-        {
-            //lastAgentCursorPos = cameraTransform.localPosition + cursorTransform.localPosition;
-        }
-        
         //Debug.Log($"Action. currentDelayAction: {currentDelayAction}");
     }
 
