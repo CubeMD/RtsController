@@ -52,7 +52,7 @@ MonoBehaviour:
   numGaussianReclaim: 75
   agents:
   - {fileID: 6073555764631712557}
-  timeWhenReset: 60
+  timeWhenReset: 10
   timeSinceReset: 0
 --- !u!1001 &623692831023433168
 PrefabInstance:

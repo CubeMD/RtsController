@@ -257,7 +257,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BrainParameters:
-    VectorObservationSize: 6
+    VectorObservationSize: 7
     NumStackedVectorObservations: 1
     m_ActionSpec:
       m_NumContinuousActions: 3
@@ -309,7 +309,7 @@ MonoBehaviour:
   cameraMovementBorderPercentage: 0.01
   cameraPanningSpeed: 75
   zoomMinMax: {x: 20, y: 100}
-  decisionTimeMinMax: {x: 0.1, y: 0.11}
+  minMeanMaxActionDelay: {x: 0, y: 1, z: 5}
   interactableLayerMask:
     serializedVersion: 2
     m_Bits: 64

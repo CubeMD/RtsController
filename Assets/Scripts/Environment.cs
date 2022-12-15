@@ -30,7 +30,7 @@ public class Environment : MonoBehaviour
         
         foreach (RtsAgent rtsAgent in agents)
         {
-            OnEnvironmentReset += rtsAgent.EndEpisode;
+            OnEnvironmentReset += rtsAgent.HandleEpisodeEnded;
         }
     }
 
@@ -38,7 +38,7 @@ public class Environment : MonoBehaviour
     {
         foreach (RtsAgent rtsAgent in agents)
         {
-            OnEnvironmentReset -= rtsAgent.EndEpisode;
+            OnEnvironmentReset -= rtsAgent.HandleEpisodeEnded;
         }
     }
 
@@ -56,6 +56,8 @@ public class Environment : MonoBehaviour
     {
         OnEnvironmentReset?.Invoke();
         timeSinceReset = 0;
+        Resources.UnloadUnusedAssets();
+        
         SpawnStartingReclaim();
     }
 

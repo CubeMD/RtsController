@@ -90,7 +90,7 @@ namespace Tools
         /// </summary>
         /// <param name="prefab">Prefab to instantiate</param>
         /// <returns>Returns the instantiated prefab</returns>
-        public new static T InstantiateGameObject<T>(T prefab) where T : Object
+        public static T InstantiateGameObject<T>(T prefab) where T : Object
         {
             return InstantiateGameObject(prefab, Vector3.zero, Quaternion.identity);
         }
@@ -134,7 +134,7 @@ namespace Tools
         /// <param name="position">World position of the instantiated object</param>
         /// <param name="rotation">World rotation of the instantiated object</param>
         /// <returns>Returns the instantiated prefab</returns>
-        public new static T InstantiateGameObject<T>(T prefab, Vector3 position, Quaternion rotation) where T : Object
+        public static T InstantiateGameObject<T>(T prefab, Vector3 position, Quaternion rotation) where T : Object
         {
             return InstantiateGameObject(prefab, position, rotation, null);
         }
