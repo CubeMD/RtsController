@@ -90,7 +90,8 @@ public class RtsAgent : DebuggableAgent
     [Header("Parameters")]
     [SerializeField] private float zoomSpeed;
     [SerializeField] private Vector2 zoomMinMax;
-    [SerializeField] private Vector3 minMeanMaxActionDelay;
+    [SerializeField] private int delaySubdivisions;
+    [SerializeField] private float delayMax;
     [SerializeField] private LayerMask interactableLayerMask;
 
     [Header("Extra")]
@@ -115,6 +116,7 @@ public class RtsAgent : DebuggableAgent
     private readonly List<Unit> ownedUnits = new List<Unit>();
     private readonly List<Unit> selectedUnits = new List<Unit>();
     private readonly List<AgentStep> episodeTrajectory = new List<AgentStep>();
+    private readonly List<float> possibleDelays = new List<float>();
     
     private Vector3 lastClickWorldPos;
     private bool humanIsHoldingLeftMouseButton;
@@ -124,7 +126,12 @@ public class RtsAgent : DebuggableAgent
     public override void Initialize()
     {
         DetailedDebug($"Init at time {Time.time}");
-        Academy.Instance.AutomaticSteppingEnabled = false;
+        //Academy.Instance.AutomaticSteppingEnabled = false;
+
+        for (int i = 1; i <= delaySubdivisions; i++)
+        {
+            possibleDelays.Add(delayMax / i);
+        }
         
         if (isHuman)
         {
@@ -198,7 +205,7 @@ public class RtsAgent : DebuggableAgent
             
             timeSinceLastDecision += Time.fixedDeltaTime;
             
-            if (timeSinceLastDecision >= minMeanMaxActionDelay.z || completedRtsAgentStep.rtsAgentAction != null)
+            if (timeSinceLastDecision >= delayMax || completedRtsAgentStep.rtsAgentAction != null)
             {
                 DetailedDebug($"Action recorded in fixed update at time {Time.time}");
                 
@@ -209,10 +216,10 @@ public class RtsAgent : DebuggableAgent
                 
                 completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction(cursorAction, timeSinceLastDecision, AgentActionType.None, false, 0);
                 
-                // Regularize continuous actions
-                AddReward(-0.005f);
-                AddReward(-0.005f * completedRtsAgentStep.rtsAgentAction.currentCursorAction.magnitude);
-                AddReward(completedRtsAgentStep.rtsAgentAction.currentZoomAction != 0 ? -0.01f : 0f);
+                // // Regularize continuous actions
+                // AddReward(-0.005f);
+                // AddReward(-0.005f * completedRtsAgentStep.rtsAgentAction.currentCursorAction.magnitude);
+                // AddReward(completedRtsAgentStep.rtsAgentAction.currentZoomAction != 0 ? -0.01f : 0f);
                 
                 completedRtsAgentStep.reward = GetCumulativeReward();
                 episodeTrajectory.Add(completedRtsAgentStep);
@@ -229,7 +236,7 @@ public class RtsAgent : DebuggableAgent
             
             timeSinceLastDecision += Time.fixedDeltaTime;
             
-            if (!hasCompletedAction || timeSinceLastDecision >= completedRtsAgentStep.rtsAgentAction.timeForScheduledDecision )
+            if (!hasCompletedAction || timeSinceLastDecision >= completedRtsAgentStep.rtsAgentAction.timeForScheduledDecision)
             {
                 if (hasCompletedAction)
                 {
@@ -322,13 +329,11 @@ public class RtsAgent : DebuggableAgent
 
             continuousActions[0] = nextAction.currentCursorAction.x;
             continuousActions[1] = nextAction.currentCursorAction.y;
-            continuousActions[2] = nextAction.timeForScheduledDecision < minMeanMaxActionDelay.y ? 
-                Mathf.InverseLerp(minMeanMaxActionDelay.x, minMeanMaxActionDelay.y, nextAction.timeForScheduledDecision) :
-                Mathf.InverseLerp(minMeanMaxActionDelay.y, minMeanMaxActionDelay.z, nextAction.timeForScheduledDecision);
-        
+            
             discreteActions[0] = (int)nextAction.currentAgentActionType;
             discreteActions[1] = nextAction.currentShiftAction ? 1 : 0;
             discreteActions[2] = nextAction.currentZoomAction;
+            discreteActions[3] = possibleDelays.IndexOf(possibleDelays.First(x => nextAction.timeForScheduledDecision <= x));
             
             SetReward(episodeTrajectory[0].reward);
         }
@@ -343,7 +348,7 @@ public class RtsAgent : DebuggableAgent
         Vector3 lastClickNorm = cameraTransform.InverseTransformPoint(lastClickWorldPos) / CameraZoom;
         float zoomObservation = Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom);
         float time = environment.timeSinceReset / environment.timeWhenReset;
-        float timeSinceDecision = timeSinceLastDecision / minMeanMaxActionDelay.z;
+        float timeSinceDecision = timeSinceLastDecision / delayMax;
         
         float[] vectorObservations =
         {
@@ -479,22 +484,16 @@ public class RtsAgent : DebuggableAgent
             Vector2 currentCursorAction = new Vector2(
                 Mathf.Clamp(continuousActions[0], -1f, 1f),
                 Mathf.Clamp(continuousActions[1], -1f, 1f));
-            float currentDelayAction = Mathf.Clamp(continuousActions[2], -1f, 1f);
-
+            
             AgentActionType currentAgentActionType = (AgentActionType)discreteActions[0];
             bool currentShiftAction = discreteActions[1] == 1;
-
             int currentZoomAction = discreteActions[2] - 1;
-            
-            float timeForScheduledDecision = currentDelayAction < 0 ? 
-                Mathf.Lerp(minMeanMaxActionDelay.x, minMeanMaxActionDelay.y, currentDelayAction + 1) :
-                Mathf.Lerp(minMeanMaxActionDelay.y, minMeanMaxActionDelay.z, currentDelayAction);
+            float timeForScheduledDecision = possibleDelays[discreteActions[3]];
             
             completedRtsAgentStep.rtsAgentAction = new RtsAgentAction(currentCursorAction, timeForScheduledDecision, currentAgentActionType, currentShiftAction, currentZoomAction);
+            AddReward(- 0.05f * Mathf.Pow((possibleDelays[delaySubdivisions / 2] - timeForScheduledDecision) / delayMax, 2));
+            AddReward(currentZoomAction != 0 ? -0.05f : 0f);
             
-            AddReward(-0.005f);
-            AddReward(-0.005f * completedRtsAgentStep.rtsAgentAction.currentCursorAction.magnitude);
-            AddReward(completedRtsAgentStep.rtsAgentAction.currentZoomAction != 0 ? -0.01f : 0f);
         }
     }
 

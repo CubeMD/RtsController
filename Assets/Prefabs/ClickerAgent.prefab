@@ -260,8 +260,8 @@ MonoBehaviour:
     VectorObservationSize: 7
     NumStackedVectorObservations: 1
     m_ActionSpec:
-      m_NumContinuousActions: 3
-      BranchSizes: 030000000200000003000000
+      m_NumContinuousActions: 2
+      BranchSizes: 03000000020000000300000005000000
     VectorActionSize: 
     VectorActionDescriptions: []
     VectorActionSpaceType: 0
@@ -306,15 +306,15 @@ MonoBehaviour:
   numStartingUnits: 10
   startingUnitSpread: 25
   zoomSpeed: 10
-  cameraMovementBorderPercentage: 0.01
-  cameraPanningSpeed: 75
   zoomMinMax: {x: 20, y: 100}
-  minMeanMaxActionDelay: {x: 0, y: 1, z: 5}
+  delaySubdivisions: 5
+  delayMax: 2.5
   interactableLayerMask:
     serializedVersion: 2
     m_Bits: 64
   isHuman: 0
   drawBufferSensorMonitor: 0
+  detailedDebug: 0
 --- !u!114 &1293692952763402599
 MonoBehaviour:
   m_ObjectHideFlags: 0
