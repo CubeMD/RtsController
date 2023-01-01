@@ -78,10 +78,6 @@ PrefabInstance:
       value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
-      propertyPath: numStartingUnits
-      value: 10
-      objectReference: {fileID: 0}
-    - target: {fileID: 6696386017978103549, guid: 04a2e63cf4a7cb4498d46de0d5fe7841, type: 3}
       propertyPath: environmentController
       value: 
       objectReference: {fileID: 1689441413796829984}

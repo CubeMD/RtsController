@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   orderType: 30
   range: 3
-  power: 1
+  power: 10
