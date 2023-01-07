@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using AgentDebugTool.Scripts.Agent;
+using Mono.Cecil;
 using Systems.Interfaces;
 using Systems.Orders;
 using Templates;
@@ -19,27 +20,19 @@ using Random = UnityEngine.Random;
 
 public class RtsAgent : DebuggableAgent
 {
-    public enum AgentActionType
-    {
-        None = 0,
-        LeftDrag = 1,
-        RightClick = 2
-    }
-    
     public class RtsAgentAction
     {
         public Vector2 currentCursorAction;
         public float timeForScheduledDecision;
-        public AgentActionType currentAgentActionType;
         public bool currentShiftAction;
-        public int currentZoomAction;
-        public RtsAgentAction(Vector2 currentCursorAction, float timeForScheduledDecision, AgentActionType currentAgentActionType, bool currentShiftAction, int currentZoomAction)
+        public List<Unit> selectedUnits;
+
+        public RtsAgentAction(Vector2 currentCursorAction, float timeForScheduledDecision, bool currentShiftAction, List<Unit> selectedUnits)
         {
             this.currentCursorAction = currentCursorAction;
             this.timeForScheduledDecision = timeForScheduledDecision;
-            this.currentAgentActionType = currentAgentActionType;
             this.currentShiftAction = currentShiftAction;
-            this.currentZoomAction = currentZoomAction;
+            this.selectedUnits = selectedUnits;
         }
 
         public RtsAgentAction()
@@ -86,12 +79,14 @@ public class RtsAgent : DebuggableAgent
     [SerializeField] private UnitTemplate startingUnitTemplate;
     [SerializeField] private int numStartingUnits = 1;
     [SerializeField] private float startingUnitSpread = 20;
+    [SerializeField] private float timeBetweenUnitSpawns;
+    [SerializeField] private float maxNumUnits;
+    [SerializeField] private int numOrderObservationsPerUnit;
     
     [Header("Parameters")]
     [SerializeField] private float zoomSpeed;
     [SerializeField] private Vector2 zoomMinMax;
-    [SerializeField] private int delaySubdivisions;
-    [SerializeField] private float delayMax;
+    [SerializeField] private List<float> possibleDelays;
     [SerializeField] private LayerMask interactableLayerMask;
 
     [Header("Extra")]
@@ -116,34 +111,28 @@ public class RtsAgent : DebuggableAgent
     private readonly List<Unit> ownedUnits = new List<Unit>();
     private readonly List<Unit> selectedUnits = new List<Unit>();
     private readonly List<AgentStep> episodeTrajectory = new List<AgentStep>();
-    private readonly List<float> possibleDelays = new List<float>();
     
-    private Vector3 lastClickWorldPos;
-    private bool humanIsHoldingLeftMouseButton;
+    private float timeSinceUnitSpawned;
+    //private bool humanIsHoldingLeftMouseButton;
     private AgentStep completedRtsAgentStep; // if the agent is not controlled by human it will contain only the last decided action
     private float timeSinceLastDecision;
+
 
     public override void Initialize()
     {
         DetailedDebug($"Init at time {Time.time}");
-        //Academy.Instance.AutomaticSteppingEnabled = false;
 
-        for (int i = 1; i <= delaySubdivisions; i++)
-        {
-            possibleDelays.Add(delayMax / i);
-        }
-        
         if (isHuman)
         {
             Cursor.lockState = CursorLockMode.Confined;
         }
     }
     
-    public void Start()
-    {
-        DetailedDebug($"Start at time {Time.time}");
-        Academy.Instance.EnvironmentStep();
-    }
+    // public void Start()
+    // {
+    //     DetailedDebug($"Start at time {Time.time}");
+    //     Academy.Instance.EnvironmentStep();
+    // }
 
     public override void OnEpisodeBegin()
     {
@@ -160,11 +149,11 @@ public class RtsAgent : DebuggableAgent
 
         completedRtsAgentStep = new AgentStep();
         timeSinceLastDecision = 0;
-        lastClickWorldPos = cursorTransform.position;
-        
+        timeSinceUnitSpawned = 0;
+
         if (isHuman)
         {
-            humanIsHoldingLeftMouseButton = false;
+            //humanIsHoldingLeftMouseButton = false;
             episodeTrajectory.Clear();
         }
         
@@ -195,40 +184,48 @@ public class RtsAgent : DebuggableAgent
     public void FixedUpdate()
     {
         DetailedDebug($"Fixed update at time {Time.time}");
+
+        timeSinceUnitSpawned += Time.fixedDeltaTime;
+
+        if (timeSinceUnitSpawned >= timeBetweenUnitSpawns && ownedUnits.Count < maxNumUnits)
+        {
+            SpawnStartingUnits();
+            timeSinceUnitSpawned = 0;
+        }
         
         if (isHuman)
         {
-            if (timeSinceLastDecision == 0)
-            {
-                completedRtsAgentStep.rtsAgentObservation = GetAgentEnvironmentObservation();
-            }
-            
-            timeSinceLastDecision += Time.fixedDeltaTime;
-            
-            if (timeSinceLastDecision >= delayMax || completedRtsAgentStep.rtsAgentAction != null)
-            {
-                DetailedDebug($"Action recorded in fixed update at time {Time.time}");
-                
-                Vector3 humanCursorPositionRelativeToCamera = cameraTransform.InverseTransformPoint(cam.ScreenToWorldPoint(Input.mousePosition));
-                Vector2 cursorAction = new Vector2(
-                    Mathf.Clamp(humanCursorPositionRelativeToCamera.x / CameraZoom, -1f, 1), 
-                    Mathf.Clamp(humanCursorPositionRelativeToCamera.z / CameraZoom, -1f, 1));
-                
-                completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction(cursorAction, timeSinceLastDecision, AgentActionType.None, false, 0);
-                
-                // // Regularize continuous actions
-                // AddReward(-0.005f);
-                // AddReward(-0.005f * completedRtsAgentStep.rtsAgentAction.currentCursorAction.magnitude);
-                // AddReward(completedRtsAgentStep.rtsAgentAction.currentZoomAction != 0 ? -0.01f : 0f);
-                
-                completedRtsAgentStep.reward = GetCumulativeReward();
-                episodeTrajectory.Add(completedRtsAgentStep);
-                
-                InteractWithEnvironment(completedRtsAgentStep.rtsAgentAction);
-                
-                timeSinceLastDecision = 0;
-                completedRtsAgentStep = new AgentStep();
-            }
+            // if (timeSinceLastDecision == 0)
+            // {
+            //     completedRtsAgentStep.rtsAgentObservation = GetAgentEnvironmentObservation();
+            // }
+            //
+            // timeSinceLastDecision += Time.fixedDeltaTime;
+            //
+            // if (timeSinceLastDecision >= delayMax || completedRtsAgentStep.rtsAgentAction != null)
+            // {
+            //     DetailedDebug($"Action recorded in fixed update at time {Time.time}");
+            //     
+            //     Vector3 humanCursorPositionRelativeToCamera = cameraTransform.InverseTransformPoint(cam.ScreenToWorldPoint(Input.mousePosition));
+            //     Vector2 cursorAction = new Vector2(
+            //         Mathf.Clamp(humanCursorPositionRelativeToCamera.x / CameraZoom, -1f, 1), 
+            //         Mathf.Clamp(humanCursorPositionRelativeToCamera.z / CameraZoom, -1f, 1));
+            //     
+            //     completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction(cursorAction, timeSinceLastDecision, AgentActionType.None, false, 0);
+            //     
+            //     // // Regularize continuous actions
+            //     // AddReward(-0.005f);
+            //     // AddReward(-0.005f * completedRtsAgentStep.rtsAgentAction.currentCursorAction.magnitude);
+            //     // AddReward(completedRtsAgentStep.rtsAgentAction.currentZoomAction != 0 ? -0.01f : 0f);
+            //     
+            //     completedRtsAgentStep.reward = GetCumulativeReward();
+            //     episodeTrajectory.Add(completedRtsAgentStep);
+            //     
+            //     InteractWithEnvironment(completedRtsAgentStep.rtsAgentAction);
+            //     
+            //     timeSinceLastDecision = 0;
+            //     completedRtsAgentStep = new AgentStep();
+            // }
         }
         else if (!isHuman)
         {
@@ -238,76 +235,76 @@ public class RtsAgent : DebuggableAgent
             
             if (!hasCompletedAction || timeSinceLastDecision >= completedRtsAgentStep.rtsAgentAction.timeForScheduledDecision)
             {
-                if (hasCompletedAction)
-                {
-                    InteractWithEnvironment(completedRtsAgentStep.rtsAgentAction);
-                }
+                // if (hasCompletedAction)
+                // {
+                //     
+                // }
                 
                 timeSinceLastDecision = 0;
                 RequestDecision();
-                Academy.Instance.EnvironmentStep();
+                // Academy.Instance.EnvironmentStep();
             }
         }
     }
     
     private void Update()
     {
-        DetailedDebug($"Update at time {Time.time}");
-       
-        if (!isHuman || 
-            !Application.isFocused ||
-            IsMouseOutOfScreen() || 
-            completedRtsAgentStep.rtsAgentAction != null) return;
-        
-        if (Input.mouseScrollDelta.y != 0 && !humanIsHoldingLeftMouseButton)
-        {
-            completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction
-            {
-                currentZoomAction = -Input.mouseScrollDelta.y < 0 ? -1 : 1
-            };
-        }
-        else if (Input.GetKeyDown(KeyCode.Mouse0))
-        {
-            humanIsHoldingLeftMouseButton = true;
-            
-            completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction
-            {
-                currentAgentActionType = AgentActionType.None
-            };
-        }
-        else if (Input.GetKeyUp(KeyCode.Mouse0))
-        {
-            humanIsHoldingLeftMouseButton = false;
-            
-            completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction
-            {
-                currentAgentActionType = AgentActionType.LeftDrag
-            };
-        }
-        else if (Input.GetKeyDown(KeyCode.Mouse1) && !humanIsHoldingLeftMouseButton)
-        {
-            completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction
-            {
-                currentAgentActionType = AgentActionType.RightClick
-            };
-        }
-
-        if (completedRtsAgentStep.rtsAgentAction != null)
-        {
-            DetailedDebug($"Action recorded in update at time {Time.time}");
-            Vector3 humanCursorPositionRelativeToCamera = cameraTransform.InverseTransformPoint(cam.ScreenToWorldPoint(Input.mousePosition));
-            
-            completedRtsAgentStep.rtsAgentAction.currentCursorAction = new Vector2(
-                Mathf.Clamp(humanCursorPositionRelativeToCamera.x / CameraZoom, -1f, 1), 
-                Mathf.Clamp(humanCursorPositionRelativeToCamera.z / CameraZoom, -1f, 1));
-            
-            completedRtsAgentStep.rtsAgentAction.timeForScheduledDecision = timeSinceLastDecision;
-            
-            if (Input.GetKey(KeyCode.LeftShift))
-            {
-                completedRtsAgentStep.rtsAgentAction.currentShiftAction = true;
-            }
-        }
+        // DetailedDebug($"Update at time {Time.time}");
+        //
+        // if (!isHuman || 
+        //     !Application.isFocused ||
+        //     IsMouseOutOfScreen() || 
+        //     completedRtsAgentStep.rtsAgentAction != null) return;
+        //
+        // if (Input.mouseScrollDelta.y != 0 && !humanIsHoldingLeftMouseButton)
+        // {
+        //     completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction
+        //     {
+        //         currentZoomAction = -Input.mouseScrollDelta.y < 0 ? -1 : 1
+        //     };
+        // }
+        // else if (Input.GetKeyDown(KeyCode.Mouse0))
+        // {
+        //     humanIsHoldingLeftMouseButton = true;
+        //     
+        //     completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction
+        //     {
+        //         currentAgentActionType = AgentActionType.None
+        //     };
+        // }
+        // else if (Input.GetKeyUp(KeyCode.Mouse0))
+        // {
+        //     humanIsHoldingLeftMouseButton = false;
+        //     
+        //     completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction
+        //     {
+        //         currentAgentActionType = AgentActionType.LeftDrag
+        //     };
+        // }
+        // else if (Input.GetKeyDown(KeyCode.Mouse1) && !humanIsHoldingLeftMouseButton)
+        // {
+        //     completedRtsAgentStep.rtsAgentAction ??= new RtsAgentAction
+        //     {
+        //         currentAgentActionType = AgentActionType.RightClick
+        //     };
+        // }
+        //
+        // if (completedRtsAgentStep.rtsAgentAction != null)
+        // {
+        //     DetailedDebug($"Action recorded in update at time {Time.time}");
+        //     Vector3 humanCursorPositionRelativeToCamera = cameraTransform.InverseTransformPoint(cam.ScreenToWorldPoint(Input.mousePosition));
+        //     
+        //     completedRtsAgentStep.rtsAgentAction.currentCursorAction = new Vector2(
+        //         Mathf.Clamp(humanCursorPositionRelativeToCamera.x / CameraZoom, -1f, 1), 
+        //         Mathf.Clamp(humanCursorPositionRelativeToCamera.z / CameraZoom, -1f, 1));
+        //     
+        //     completedRtsAgentStep.rtsAgentAction.timeForScheduledDecision = timeSinceLastDecision;
+        //     
+        //     if (Input.GetKey(KeyCode.LeftShift))
+        //     {
+        //         completedRtsAgentStep.rtsAgentAction.currentShiftAction = true;
+        //     }
+        // }
     }
 
     private bool IsMouseOutOfScreen()
@@ -320,23 +317,31 @@ public class RtsAgent : DebuggableAgent
 
     public override void Heuristic(in ActionBuffers actionsOut)
     {
-        if (isHuman)
-        {
-            ActionSegment<float> continuousActions = actionsOut.ContinuousActions;
-            ActionSegment<int> discreteActions = actionsOut.DiscreteActions;
-            
-            RtsAgentAction nextAction = episodeTrajectory[0].rtsAgentAction;
+        // if (isHuman)
+        // {
+        //     ActionSegment<float> continuousActions = actionsOut.ContinuousActions;
+        //     ActionSegment<int> discreteActions = actionsOut.DiscreteActions;
+        //     
+        //     RtsAgentAction nextAction = episodeTrajectory[0].rtsAgentAction;
+        //
+        //     continuousActions[0] = nextAction.currentCursorAction.x;
+        //     continuousActions[1] = nextAction.currentCursorAction.y;
+        //     
+        //     discreteActions[0] = (int)nextAction.currentAgentActionType;
+        //     discreteActions[1] = nextAction.currentShiftAction ? 1 : 0;
+        //     discreteActions[2] = nextAction.currentZoomAction;
+        //     discreteActions[3] = possibleDelays.IndexOf(possibleDelays.First(x => nextAction.timeForScheduledDecision <= x));
+        //     
+        //     SetReward(episodeTrajectory[0].reward);
+        // }
+    }
 
-            continuousActions[0] = nextAction.currentCursorAction.x;
-            continuousActions[1] = nextAction.currentCursorAction.y;
-            
-            discreteActions[0] = (int)nextAction.currentAgentActionType;
-            discreteActions[1] = nextAction.currentShiftAction ? 1 : 0;
-            discreteActions[2] = nextAction.currentZoomAction;
-            discreteActions[3] = possibleDelays.IndexOf(possibleDelays.First(x => nextAction.timeForScheduledDecision <= x));
-            
-            SetReward(episodeTrajectory[0].reward);
-        }
+    private float[] ConvertIndexToOneHot(int index, int indexCount)
+    {
+        float[] result = new float[indexCount];
+        result[index] = 1;
+        
+        return result;
     }
 
     private RtsAgentObservation GetAgentEnvironmentObservation()
@@ -344,32 +349,32 @@ public class RtsAgent : DebuggableAgent
         Monitor.RemoveAllValuesFromAllTransforms();
         DetailedDebug($"Environment observed at time {Time.time}");
         
-        Vector3 camNormPos = cameraTransform.localPosition / MapSize;
-        Vector3 lastClickNorm = cameraTransform.InverseTransformPoint(lastClickWorldPos) / CameraZoom;
-        float zoomObservation = Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom);
+        // Vector3 camNormPos = cameraTransform.localPosition / MapSize;
+        // Vector3 lastClickNorm = cameraTransform.InverseTransformPoint(lastClickWorldPos) / CameraZoom;
+        // float zoomObservation = Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom);
         float time = environment.timeSinceReset / environment.timeWhenReset;
-        float timeSinceDecision = timeSinceLastDecision / delayMax;
+        // float timeSinceDecision = timeSinceLastDecision / delayMax;
         
         float[] vectorObservations =
         {
-            camNormPos.x,
-            camNormPos.z,
-            lastClickNorm.x,
-            lastClickNorm.z,
-            zoomObservation,
+            // camNormPos.x,
+            // camNormPos.z,
+            // lastClickNorm.x,
+            // lastClickNorm.z,
+            // zoomObservation,
             time,
-            timeSinceDecision 
+            // timeSinceDecision 
         };
         
-        observationsDebugSet.Add("Cam Pos X", $"{camNormPos.x:.0}");
-        observationsDebugSet.Add("Cam Pos Z", $"{camNormPos.z:.0}");
-        
-        observationsDebugSet.Add("Cursor Pos X", $"{lastClickNorm.x:.0}");
-        observationsDebugSet.Add("Cursor Pos Z", $"{lastClickNorm.z:.0}");
-        
-        observationsDebugSet.Add("Zoom", $"{zoomObservation:.0}");
+        // observationsDebugSet.Add("Cam Pos X", $"{camNormPos.x:.0}");
+        // observationsDebugSet.Add("Cam Pos Z", $"{camNormPos.z:.0}");
+        //
+        // observationsDebugSet.Add("Cursor Pos X", $"{lastClickNorm.x:.0}");
+        // observationsDebugSet.Add("Cursor Pos Z", $"{lastClickNorm.z:.0}");
+        //
+        // observationsDebugSet.Add("Zoom", $"{zoomObservation:.0}");
         observationsDebugSet.Add("Time", $"{time:.0}");
-        observationsDebugSet.Add("Time Since Decision", $"{timeSinceDecision:.0}");
+        // observationsDebugSet.Add("Time Since Decision", $"{timeSinceDecision:.0}");
 
         List<List<float[]>> observations = new List<List<float[]>>
         {
@@ -378,9 +383,12 @@ public class RtsAgent : DebuggableAgent
             new List<float[]>()
         };
 
-        foreach (Collider col in Physics.OverlapBox(cameraTransform.position, Vector3.one * CameraZoom, Quaternion.identity, interactableLayerMask))
+        var colliders = Physics.OverlapBox(environment.transform.position, Vector3.one * MapSize, Quaternion.identity,
+            interactableLayerMask);
+        
+        foreach (Collider col in colliders)
         {
-            Vector3 relNormPos = cameraTransform.InverseTransformPoint(col.transform.position) / CameraZoom;
+            Vector3 relNormPos = environment.transform.InverseTransformPoint(col.transform.position) / MapSize;
             
             List<float> interactableObservation = new List<float>
             {
@@ -390,54 +398,58 @@ public class RtsAgent : DebuggableAgent
             
             if (col.TryGetComponent(out Reclaim reclaim))
             {
-                interactableObservation.Add(reclaim.Amount);
+                interactableObservation.Add(reclaim.Amount / 10f);
                 observations[0].Add(interactableObservation.ToArray());
                 
                 if (drawBufferSensorMonitor)
                 {
-                    Monitor.Log("Data: ", string.Join(" ", interactableObservation), col.transform);
+                    Monitor.Log("Data: ", string.Join(" ", interactableObservation.ConvertAll(x => x == 0 || x == 1 ? x.ToString() : x.ToString("F1"))), col.transform);
                     Monitor.Log("Type: ", "Reclaim", col.transform);
                 }
             }
             else if (col.TryGetComponent(out Unit unit))
             {
-                interactableObservation.Add(selectedUnits.Contains(unit) ? 1 : 0);
-                observations[1].Add(interactableObservation.ToArray());
+                interactableObservation.AddRange(ConvertIndexToOneHot(ownedUnits.IndexOf(unit), unitSensorComponent.MaxNumObservables));
+                interactableObservation.Add(unit.assignedOrders.Count / 5f);
+                
+                for (int i = 0; i < numOrderObservationsPerUnit; i++)
+                {
+                    List<float> orderObservation;
+                    
+                    if (i < unit.assignedOrders.Count)
+                    {
+                        Vector3 relOrderNormPos = environment.transform.InverseTransformPoint(unit.assignedOrders[i].transform.position) / MapSize;
+                        
+                        orderObservation = new List<float>
+                        {
+                            relOrderNormPos.x,
+                            relOrderNormPos.z,
+                            1
+                        };
+                    }
+                    else
+                    {
+                        orderObservation = new List<float>
+                        {
+                            0,
+                            0,
+                            0
+                        };
+                    }
+                    
+                    interactableObservation.AddRange(orderObservation);
+                }
                 
                 if (drawBufferSensorMonitor)
                 {
-                    Monitor.Log("Data: ", string.Join(" ", interactableObservation), col.transform);
+                    Monitor.Log("Data: ", string.Join(" ", interactableObservation.ConvertAll(x => x == 0 || x == 1 ? x.ToString() : x.ToString("F1"))), col.transform);
                     Monitor.Log("Type: ", "Unit", col.transform);
                 }
-            }
-            else if (col.TryGetComponent(out Order order))
-            {
-                foreach (Unit assignedUnit in order.assignedUnits)
-                {
-                    Vector3 relUnitNormPos = cameraTransform.InverseTransformPoint(assignedUnit.transform.position) / CameraZoom;
-                    Vector3 relOrderNormPos = cameraTransform.InverseTransformPoint(order.transform.position) / CameraZoom;
-                
-                    List<float> orderObservation = new List<float>
-                    {
-                        relUnitNormPos.x,
-                        relUnitNormPos.z,
-                        relOrderNormPos.x,
-                        relOrderNormPos.z,
-                        order.orderType == OrderType.Move ? 1 : 0,
-                        order.orderType == OrderType.Reclaim ? 1 : 0,
-                        assignedUnit.assignedOrders.IndexOf(order)
-                    };
 
-                    observations[2].Add(orderObservation.ToArray());
-                    
-                    if (drawBufferSensorMonitor)
-                    {
-                        Monitor.Log("Data: ", string.Join(" ", orderObservation), order.transform);
-                        Monitor.Log("Type: ", "Order", order.transform);
-                    }
-                }
+                observations[1].Add(interactableObservation.ToArray());
             }
         }
+        
         BroadcastObservationsCollected();
         
         return new RtsAgentObservation(vectorObservations, observations);
@@ -470,6 +482,14 @@ public class RtsAgent : DebuggableAgent
         }
     }
 
+    public override void WriteDiscreteActionMask(IDiscreteActionMask actionMask)
+    {
+        for (int i = 0; i < unitSensorComponent.MaxNumObservables; i++)
+        {
+            actionMask.SetActionEnabled(i, 1, i < ownedUnits.Count);
+        }
+    }
+    
     public override void OnActionReceived(ActionBuffers actions)
     {
         base.OnActionReceived(actions);
@@ -485,79 +505,150 @@ public class RtsAgent : DebuggableAgent
                 Mathf.Clamp(continuousActions[0], -1f, 1f),
                 Mathf.Clamp(continuousActions[1], -1f, 1f));
             
-            AgentActionType currentAgentActionType = (AgentActionType)discreteActions[0];
-            bool currentShiftAction = discreteActions[1] == 1;
-            int currentZoomAction = discreteActions[2] - 1;
-            float timeForScheduledDecision = possibleDelays[discreteActions[3]];
+            selectedUnits.Clear();
+
+            for (int i = 0; i < unitSensorComponent.MaxNumObservables; i++)
+            {
+                if (discreteActions[i] == 1)
+                {
+                    if (i < ownedUnits.Count)
+                    {
+                        selectedUnits.Add(ownedUnits[i]);
+                    }
+                    else
+                    {
+                        Debug.LogError("Selected nonexistent target object");
+                    }
+                    
+                }
+            }
             
-            completedRtsAgentStep.rtsAgentAction = new RtsAgentAction(currentCursorAction, timeForScheduledDecision, currentAgentActionType, currentShiftAction, currentZoomAction);
-            AddReward(- 0.05f * Mathf.Pow((possibleDelays[delaySubdivisions / 2] - timeForScheduledDecision) / delayMax, 2));
-            AddReward(currentZoomAction != 0 ? -0.05f : 0f);
+            // AgentActionType currentAgentActionType = (AgentActionType)discreteActions[0];
+            bool currentShiftAction = discreteActions[unitSensorComponent.MaxNumObservables] == 1;
+            // int currentZoomAction = discreteActions[2] - 1;
+            float timeForScheduledDecision = 2.5f;//possibleDelays[discreteActions[unitSensorComponent.MaxNumObservables + 1]];
             
+            completedRtsAgentStep.rtsAgentAction = new RtsAgentAction(currentCursorAction, timeForScheduledDecision, currentShiftAction, selectedUnits);
+            
+            InteractWithEnvironment(completedRtsAgentStep.rtsAgentAction);
+            //AddReward(-0.25f);
+            //AddReward(currentZoomAction != 0 ? -0.05f : 0f);
         }
     }
 
     private void InteractWithEnvironment(RtsAgentAction rtsAgentAction)
     {
-        DetailedDebug($"Interacted with environment at time {Time.time}");
-        selectionBoxTransform.localScale = Vector3.zero;
-        selectionBoxTransform.localPosition = Vector3.zero;
-        lastClickWorldPos = cursorTransform.position;
-        
-        // Move cursor
+        // DetailedDebug($"Interacted with environment at time {Time.time}");
+        // selectionBoxTransform.localScale = Vector3.zero;
+        // selectionBoxTransform.localPosition = Vector3.zero;
+        // lastClickWorldPos = cursorTransform.position;
+        //
+        // // Move cursor
         cursorTransform.localPosition = new Vector3(
-            CameraZoom * rtsAgentAction.currentCursorAction.x,
+            MapSize * rtsAgentAction.currentCursorAction.x,
             0,
-            CameraZoom * rtsAgentAction.currentCursorAction.y);
+            MapSize * rtsAgentAction.currentCursorAction.y);
         
-        if (rtsAgentAction.currentAgentActionType == AgentActionType.LeftDrag)
+        // if (rtsAgentAction.currentAgentActionType == AgentActionType.LeftDrag)
+        // {
+        //     // Left click
+        //     Vector3 cursorOffset = cursorTransform.position - lastClickWorldPos;
+        //     selectionBoxTransform.localScale = new Vector3(Mathf.Abs(cursorOffset.x), 1, Mathf.Abs(cursorOffset.z));
+        //     selectionBoxTransform.localPosition = cursorTransform.localPosition - cursorOffset / 2;
+        //
+        //     if (!rtsAgentAction.currentShiftAction)
+        //     {
+        //         selectedUnits.Clear();
+        //     }
+        //
+        //     foreach (Collider col in Physics.OverlapBox(selectionBoxTransform.position,
+        //                  selectionBoxTransform.localScale / 2,
+        //                  Quaternion.identity,
+        //                  interactableLayerMask))
+        //     {
+        //         if (col.TryGetComponent(out Unit unit) && ownedUnits.Contains(unit) &&
+        //             !selectedUnits.Contains(unit))
+        //         {
+        //             selectedUnits.Add(unit);
+        //         }
+        //     }
+        // }
+        // if (rtsAgentAction.currentAgentActionType == AgentActionType.RightClick)
+        // {
+        //     
+        // }
+
+        if (rtsAgentAction.selectedUnits.Count > 0)
         {
-            // Left click
-            Vector3 cursorOffset = cursorTransform.position - lastClickWorldPos;
-            selectionBoxTransform.localScale = new Vector3(Mathf.Abs(cursorOffset.x), 1, Mathf.Abs(cursorOffset.z));
-            selectionBoxTransform.localPosition = cursorTransform.localPosition - cursorOffset / 2;
-
-            if (!rtsAgentAction.currentShiftAction)
+            Reclaim targetReclaim = null;
+            float minFoundDistance = float.MaxValue;
+            float currentDistance;
+            
+            foreach (Reclaim reclaim in environment.reclaims)
             {
-                selectedUnits.Clear();
-            }
-
-            foreach (Collider col in Physics.OverlapBox(selectionBoxTransform.position,
-                         selectionBoxTransform.localScale / 2,
-                         Quaternion.identity,
-                         interactableLayerMask))
-            {
-                if (col.TryGetComponent(out Unit unit) && ownedUnits.Contains(unit) &&
-                    !selectedUnits.Contains(unit))
+                currentDistance = Vector3.Distance(reclaim.transform.position, 
+                    new Vector3(
+                        completedRtsAgentStep.rtsAgentAction.currentCursorAction.x, 
+                        0, 
+                        completedRtsAgentStep.rtsAgentAction.currentCursorAction.y) * MapSize);
+                
+                if (currentDistance < minFoundDistance)
                 {
-                    selectedUnits.Add(unit);
+                    minFoundDistance = currentDistance;
+                    targetReclaim = reclaim;
                 }
             }
-        }
-        else if (rtsAgentAction.currentAgentActionType == AgentActionType.RightClick)
-        {
-            //Right click
-            Ray ray = new Ray(cursorTransform.position + Vector3.up * 25f, Vector3.down);
 
-            if (Physics.Raycast(ray, out RaycastHit hitInfo, 50f, interactableLayerMask))
+            if (targetReclaim != null)
             {
-                CreateAndAssignOrder(hitInfo, selectedUnits, rtsAgentAction.currentShiftAction);
+                AddReward(-minFoundDistance / MapSize);
+            
+                //Right click
+                Ray ray = new Ray(targetReclaim.transform.position + Vector3.up * 25f, Vector3.down);
+
+                if (Physics.Raycast(ray, out RaycastHit hitInfo, 50f, interactableLayerMask))
+                {
+                    float distanceFromTargetReward = 0;
+                    
+                    foreach (Unit selectedUnit in rtsAgentAction.selectedUnits)
+                    {
+                        if (rtsAgentAction.currentShiftAction)
+                        {
+                            if (selectedUnit.assignedOrders.Count > 0)
+                            {
+                                distanceFromTargetReward += Vector3.Distance(selectedUnit.assignedOrders.Last().position, targetReclaim.transform.position) / MapSize;
+                            }
+                            else
+                            {
+                                distanceFromTargetReward += Vector3.Distance(selectedUnit.transform.position, targetReclaim.transform.position) / MapSize;
+                            }
+                        }
+                        else
+                        {
+                            distanceFromTargetReward += Vector3.Distance(selectedUnit.transform.position, targetReclaim.transform.position) / MapSize;
+                        }
+
+                    }   
+                    
+                    AddReward(-distanceFromTargetReward);
+                    CreateAndAssignOrder(hitInfo, rtsAgentAction.selectedUnits, rtsAgentAction.currentShiftAction);
+                }
             }
         }
         
         //Zoom camera and correct mouse
-        if (rtsAgentAction.currentZoomAction != 0)
-        {
-            float clampedZoomOffset = Mathf.Clamp(rtsAgentAction.currentZoomAction * zoomSpeed, zoomMinMax.x - CameraZoom, zoomMinMax.y - CameraZoom);
-
-            if (clampedZoomOffset < 0)
-            {
-                cameraTransform.localPosition += cursorTransform.localPosition * ((1 - Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom + clampedZoomOffset)) * 0.4f);
-            }
-            
-            cursorTransform.localPosition *= (CameraZoom + clampedZoomOffset) / CameraZoom;
-            CameraZoom += clampedZoomOffset;
-        }
+        // if (rtsAgentAction.currentZoomAction != 0)
+        // {
+        //     float clampedZoomOffset = Mathf.Clamp(rtsAgentAction.currentZoomAction * zoomSpeed, zoomMinMax.x - CameraZoom, zoomMinMax.y - CameraZoom);
+        //
+        //     if (clampedZoomOffset < 0)
+        //     {
+        //         cameraTransform.localPosition += cursorTransform.localPosition * ((1 - Mathf.InverseLerp(zoomMinMax.x, zoomMinMax.y, CameraZoom + clampedZoomOffset)) * 0.4f);
+        //     }
+        //     
+        //     cursorTransform.localPosition *= (CameraZoom + clampedZoomOffset) / CameraZoom;
+        //     CameraZoom += clampedZoomOffset;
+        // }
         //
         // // Move Camera
         // Vector3 desiredCameraOffset = new Vector3(
@@ -627,7 +718,7 @@ public class RtsAgent : DebuggableAgent
         for (int index = 0; index < count; index++)
         {
             RequestDecision();
-            Academy.Instance.EnvironmentStep();
+//            Academy.Instance.EnvironmentStep();
             episodeTrajectory.RemoveAt(0);
         }
             
@@ -645,12 +736,7 @@ public class RtsAgent : DebuggableAgent
             EndEpisode();
         }
     }
-
-    public void UnAssignedUnitOrder()
-    {
-        //AddReward(-0.005f);
-    }
-
+    
     public void DetailedDebug(string s)
     {
         if (detailedDebug)

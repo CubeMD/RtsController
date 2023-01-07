@@ -64,6 +64,7 @@ namespace Systems.Orders
 
         private void HandleOrderDependencyDestroyed(IDestroyable destroyable)
         {
+            //owner.AddReward(-0.1f);
             ObjectPooler.PoolGameObject(gameObject);
         }
         

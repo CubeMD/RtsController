@@ -128,7 +128,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   lineRenderer: {fileID: 4685051864202134946}
-  activeOrder: {fileID: 0}
+  renderOrderLines: 1
+  owner: {fileID: 0}
 --- !u!120 &4685051864202134946
 LineRenderer:
   m_ObjectHideFlags: 0

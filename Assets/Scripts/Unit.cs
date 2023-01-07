@@ -14,7 +14,8 @@ public class Unit : MonoBehaviour, IDestroyable
     public event Action<IDestroyable> OnDestroyableDestroy;
 
     [SerializeField] private LineRenderer lineRenderer;
-
+    [SerializeField] private bool renderOrderLines;
+    
     public RtsAgent owner;
     private UnitTemplate unitTemplate;
     private Environment environment;
@@ -73,7 +74,10 @@ public class Unit : MonoBehaviour, IDestroyable
             ExecuteCurrentOrder();
         }
         
-        RenderOrderLines();
+        if (renderOrderLines)
+        {
+            RenderOrderLines();
+        }
     }
 
     public void ExecuteCurrentOrder()
@@ -157,7 +161,7 @@ public class Unit : MonoBehaviour, IDestroyable
 
         foreach (Order assignedOrder in assignedOrders)
         {
-            owner.UnAssignedUnitOrder();
+            owner.AddReward(-1f);
             assignedOrder.UnAssignUnit(this);
         }
         

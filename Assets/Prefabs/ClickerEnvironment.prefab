@@ -45,6 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 754a93b5730349a1b5b3a4d13fffd8e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  reclaims: []
   halfGroundSize: 0
   ground: {fileID: 8490167346486103102}
   reclaimMinMax: {x: 0, y: 20}

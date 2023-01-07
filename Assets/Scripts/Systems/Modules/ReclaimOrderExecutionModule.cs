@@ -33,6 +33,7 @@ namespace Systems.Modules
         {
             if (targetReclaim.Amount <= 0)
             {
+                OrderCompleted();
                 return;
             }
             
