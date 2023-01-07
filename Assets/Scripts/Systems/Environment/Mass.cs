@@ -22,8 +22,7 @@ namespace Systems.Environment
         
         public void GenerateRandomMassAmount()
         {
-            massAmount = Mathf.Lerp(EnvironmentGlobalSettings.MassAmountMinMax.x,
-                EnvironmentGlobalSettings.MassAmountMinMax.y, Random.value);
+            massAmount = Random.Range(EnvironmentGlobalSettings.MassAmountMinMax.x, EnvironmentGlobalSettings.MassAmountMinMax.y);
             UpdateMassMaterialColor();
         }
 
