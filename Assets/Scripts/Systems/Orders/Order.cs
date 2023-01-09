@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using Agents;
 using Systems.Interfaces;
 using Tools;
 using UnityEngine;
@@ -27,11 +28,11 @@ namespace Systems.Orders
         public List<Unit> assignedUnits;
         public bool groundOrder;
         public Vector3 position;
-        public RtsAgent owner;
+        public Player owner;
         private IDestroyable destroyable;
         
         [SuppressMessage("ReSharper", "ParameterHidesMember")]
-        public void SetOrder(Transform targetTransform, OrderType orderType, List<Unit> assignedUnits, bool groundOrder, Vector3 position, RtsAgent owner, bool additive)
+        public void SetOrder(Transform targetTransform, OrderType orderType, List<Unit> assignedUnits, bool groundOrder, Vector3 position, Player owner, bool additive)
         {
             this.targetTransform = targetTransform;
             this.orderType = orderType;

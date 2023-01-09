@@ -16,7 +16,7 @@ public class Unit : MonoBehaviour, IDestroyable
     [SerializeField] private LineRenderer lineRenderer;
     [SerializeField] private bool renderOrderLines;
     
-    public RtsAgent owner;
+    public Player owner;
     private UnitTemplate unitTemplate;
     private Environment environment;
     public readonly List<Order> assignedOrders = new List<Order>();
@@ -34,7 +34,7 @@ public class Unit : MonoBehaviour, IDestroyable
         }
     }
 
-    public void SetUnitTemplate(UnitTemplate template, RtsAgent unitOwner)
+    public void SetUnitTemplate(UnitTemplate template, Player unitOwner)
     {
         owner = unitOwner;
         unitTemplate = template;
