@@ -1,4 +1,6 @@
-﻿namespace Systems.Modules
+﻿using Objects;
+
+namespace Systems.Modules
 {
     public class Module
     {

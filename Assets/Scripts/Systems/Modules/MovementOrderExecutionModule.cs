@@ -1,5 +1,6 @@
-﻿using Systems.Orders;
-using Templates.Modules;
+﻿using Objects;
+using Objects.Orders;
+using Systems.Templates.Modules;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -7,9 +8,8 @@ namespace Systems.Modules
 {
     public class MovementOrderExecutionModule : OrderExecutionModule
     {
-        public float movementSpeed;
+        private float movementSpeed;
         private float stoppingDistance;
-        private bool followingTarget;
         private Transform targetTransform;
 
         public MovementOrderExecutionModule(MovementOrderExecutionModuleTemplate movementOrderExecutionModuleTemplate, Unit unit) : base(unit)
@@ -22,37 +22,22 @@ namespace Systems.Modules
         public override void SetExecutedOrder(Order order)
         {
             base.SetExecutedOrder(order);
-            
-            if (order.groundOrder)
-            {
-                followingTarget = false;
-                targetTransform = null;
-            }
-            else
-            {
-                followingTarget = true;
-                targetTransform = order.targetTransform;
-            }
+            targetTransform = order.targetTransform;
         }
 
         public override void Update()
         {
-            if (followingTarget && targetTransform == null)
+            if (targetTransform == null)
             {
-                OrderCompleted();
+                Debug.Log("This should not be the case");
                 return;
             }
 
             Vector3 relativePosition = executedOrder.GetOrderPosition() - unit.transform.position;
-            
-            //TODO: Go over types and assign behaviour to type
-            
+
             if (relativePosition.magnitude <= stoppingDistance)
             {
-                if (!followingTarget)
-                {
-                    OrderCompleted();
-                }
+                OrderCompleted();
                 return;
             }
 

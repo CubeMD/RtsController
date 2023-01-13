@@ -1,6 +1,6 @@
-using UnityEngine;
+﻿using UnityEngine;
 
-namespace AgentDebugTool.Scripts.Utilities
+namespace Tools.Utilities
 {
     /// <summary>
     /// Creates a singleton reference, but does not create new instance when called.
@@ -8,24 +8,20 @@ namespace AgentDebugTool.Scripts.Utilities
     /// <typeparam name="T">The type of the instance reference</typeparam>
     public class Singleton<T> : MonoBehaviour where T : Component
     {
-        private static T instance = null;
+        private static T _instance = null;
 
         public static T Instance
         {
             get
             {
-                if (instance == null)
-                {
-                    instance = FindObjectOfType(typeof(T)) as T;
-                }
-                
-                return instance;
+                if (_instance == null) _instance = FindObjectOfType(typeof(T)) as T;
+                return _instance;
             }
         }
 
         protected virtual void Awake()
         {
-            instance = Instance;
+            _instance = Instance;
         }
     }
 }

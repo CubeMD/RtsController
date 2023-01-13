@@ -1,5 +1,6 @@
-﻿using Systems.Orders;
-using Templates.Modules;
+﻿using Objects;
+using Objects.Orders;
+using Systems.Templates.Modules;
 using UnityEngine;
 
 namespace Systems.Modules
@@ -31,12 +32,6 @@ namespace Systems.Modules
 
         public override void Update()
         {
-            if (targetReclaim.Amount <= 0)
-            {
-                OrderCompleted();
-                return;
-            }
-            
             Vector3 reclaimOffset = targetReclaim.transform.position - unit.transform.position;
 
             if (reclaimOffset.magnitude - reclaimRange <= 0)
@@ -53,7 +48,13 @@ namespace Systems.Modules
                 
                 if (remainingReclaim <= 0)
                 {
-                    OrderCompleted();
+                    foreach (Unit assignedUnit in executedOrder.assignedUnits)
+                    {
+                        foreach (OrderExecutionModule orderExecutionModule in assignedUnit.orderTypeExecutionModulesTable[orderType])
+                        {
+                            orderExecutionModule.OrderCompleted();
+                        }
+                    }
                 }
             }
         }

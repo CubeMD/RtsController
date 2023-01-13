@@ -4,7 +4,7 @@ using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using UnityEngine;
 
-namespace AgentDebugTool.Scripts.Agent
+namespace Tools.Agent
 {
     /// <summary>
     /// Custom Agent class that allows 

@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace AgentDebugTool.Scripts.Utilities
+namespace Tools.Utilities
 {
     public static class VectorExtensions
     {

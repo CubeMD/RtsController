@@ -1,5 +1,6 @@
 ﻿using System;
-using Systems.Orders;
+using Objects;
+using Objects.Orders;
 
 namespace Systems.Modules
 {
@@ -22,7 +23,7 @@ namespace Systems.Modules
             executedOrder = null;
         }
         
-        protected void OrderCompleted()
+        public void OrderCompleted()
         {
             OnOrderExecutionModuleCompletedOrder?.Invoke(unit, executedOrder);
         }
