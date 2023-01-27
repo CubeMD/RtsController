@@ -29,7 +29,7 @@ namespace Players
         {
             Monitor.RemoveAllValuesFromAllTransforms();
         
-            float time = environment.timeSinceReset / environment.timeWhenReset;
+            float time = matchManager.matchTimer.timeLeft / matchManager.matchTimer.duration;
 
             float[] vectorObservations =
             {
@@ -44,11 +44,11 @@ namespace Players
             };
         
 
-            var colliders = Physics.OverlapBox(environment.transform.position, Vector3.one * mapManager.halfGroundSize, Quaternion.identity, mapManager.spaceLayerMask);
+            var colliders = Physics.OverlapBox(matchManager.transform.position, Vector3.one * matchManager.halfGroundSize, Quaternion.identity, matchManager.spaceLayerMask);
         
             foreach (Collider col in colliders)
             {
-                Vector3 relNormPos = environment.transform.InverseTransformPoint(col.transform.position) / mapManager.halfGroundSize;
+                Vector3 relNormPos = matchManager.transform.InverseTransformPoint(col.transform.position) / matchManager.halfGroundSize;
             
                 List<float> interactableObservation = new List<float>
                 {
@@ -74,7 +74,7 @@ namespace Players
 
                     if (unit.assignedOrders.Count > 0)
                     {
-                        Vector3 firstOrderPos = mapManager.transform.InverseTransformPoint(unit.assignedOrders[0].Position) / mapManager.halfGroundSize;
+                        Vector3 firstOrderPos = matchManager.transform.InverseTransformPoint(unit.assignedOrders[0].Position) / matchManager.halfGroundSize;
 
                         interactableObservation.AddRange(new List<float> {firstOrderPos.x, firstOrderPos.z, 1});
                     }
@@ -85,7 +85,7 @@ namespace Players
                     
                     if (unit.assignedOrders.Count > 1)
                     {
-                        Vector3 lastOrderPos = mapManager.transform.InverseTransformPoint(unit.assignedOrders[unit.assignedOrders.Count - 1].Position) / mapManager.halfGroundSize;
+                        Vector3 lastOrderPos = matchManager.transform.InverseTransformPoint(unit.assignedOrders[unit.assignedOrders.Count - 1].Position) / matchManager.halfGroundSize;
                             
                         interactableObservation.AddRange(new List<float> {lastOrderPos.x, lastOrderPos.z, 1});
                     }
@@ -121,7 +121,7 @@ namespace Players
                 Academy.Instance.EnvironmentStep();
             }
         }
-    
+
         private float[] ConvertIndexToOneHot(int index, int indexCount)
         {
             float[] result = new float[indexCount];

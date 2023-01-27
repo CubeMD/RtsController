@@ -3,18 +3,13 @@ using Utilities.StateMachine;
 
 namespace Units.UnitStates
 {
-    public abstract class UnitState : State
+    public abstract class UnitState<T> : State where T : Unit
     {
-        public Unit unit;
+        public T unit;
 
-        public UnitState(Unit unit) : base(unit.stateMachine)
+        public UnitState(T unit) : base(unit.stateMachine)
         {
             this.unit = unit;
-        }
-
-        public override void Terminate()
-        {
-            stateMachine.currentState = new IdleUnitState(unit);
         }
     }
 }

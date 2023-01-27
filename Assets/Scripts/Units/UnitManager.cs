@@ -12,7 +12,6 @@ namespace Units
     public class UnitManager : MonoBehaviour
     {
         public Player player;
-        public MapManager mapManager;
 
         public readonly List<Unit> ownedUnits = new List<Unit>();
         public readonly List<Unit> selectedUnits = new List<Unit>();
@@ -33,7 +32,7 @@ namespace Units
 
             for (int i = 0; i < numUnits; i++)
             {
-                ownedUnits[ownedUnits.Count - 1].DestroyUnit();
+                ownedUnits[0].DestroyUnit();
             }
         }
         
@@ -41,12 +40,13 @@ namespace Units
         {
             Unit unit = ObjectPooler.InstantiateGameObject(unitPrefab, position, Quaternion.identity, transform);
             unit.OnDestroyableDestroy += HandleUnitDestroyed;
+            unit.owner = player;
             ownedUnits.Add(unit);
         }
 
         public void SpawnCommander()
         {
-            SpawnUnit(commanderPrefab, mapManager.playerStartingPositions[player]);
+            SpawnUnit(commanderPrefab, player.startingPosition);
         }
 
         public void HandleUnitDestroyed(IDestroyable destroyable)

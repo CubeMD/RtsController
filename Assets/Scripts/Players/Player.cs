@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Agents;
 using Economy;
@@ -9,20 +10,15 @@ namespace Players
 {
     public abstract class Player : MonoBehaviour
     {
-        public Environment environment;
+        [HideInInspector] public Vector3 startingPosition;
+        
         public int teamId;
-
-        public MapManager mapManager;
+        public MatchManager matchManager;
         public EconomyManager economyManager;
         public UnitManager unitManager;
 
         private readonly List<AgentStep> episodeTrajectory = new List<AgentStep>();
-        
-        public virtual void HandleEnvironmentReset()
-        {
-            ResetPlayer();
-        }
-        
+
         public virtual void ResetPlayer()
         {
             economyManager.ResetEconomyManager();

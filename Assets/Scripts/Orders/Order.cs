@@ -48,10 +48,12 @@ namespace Orders
         private void HandleOrderDependencyDestroyed(IDestroyable dependencyDestroyable)
         {
             dependencyDestroyable.OnDestroyableDestroy -= HandleOrderDependencyDestroyed;
-            
-            foreach (Unit assignedUnit in assignedUnits)
+
+            int numUnits = assignedUnits.Count;
+
+            for (int i = 0; i < numUnits; i++)
             {
-                assignedUnit.UnAssignOrder(this);
+                assignedUnits[0].UnAssignOrder(this);
             }
         }
     }

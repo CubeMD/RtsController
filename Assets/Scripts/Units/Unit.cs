@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Interfaces;
 using Orders;
 using Players;
@@ -32,6 +33,7 @@ namespace Units
         [SerializeField] private LineRenderer lineRenderer;
 
         public readonly List<Order> assignedOrders = new List<Order>();
+        public Order executedOrder;
 
         public void Update()
         {
@@ -81,34 +83,25 @@ namespace Units
 
             if (assignedOrders.Count == 1)
             {
-                StartExecutingOrder(assignedOrders[0]);
+                StartExecutingFirstOrder();
             }
         }
 
         public void UnAssignOrder(Order order)
         {
-            if (assignedOrders.IndexOf(order) == 0)
-            {
-                TransitionToNextOrder();
-            }
-            else
-            {
-                assignedOrders.Remove(order);
-            }
+            int orderIndex = assignedOrders.IndexOf(order);
+            
+            order.assignedUnits.RemoveAt(orderIndex);
+            assignedOrders.Remove(order);
+            
+            StartExecutingFirstOrder();
         }
         
-        public virtual void StartExecutingOrder(Order order)
+        public virtual void StartExecutingFirstOrder()
         {
+            stateMachine.queuedStates.Clear();
+        }
 
-        }
-        
-        public void TransitionToNextOrder()
-        {
-            assignedOrders[0].assignedUnits.Remove(this);
-            assignedOrders.RemoveAt(0);
-            StartExecutingOrder(assignedOrders[0]);
-        }
-        
         private void RenderOrderLines()
         {
             List<Vector3> points = new List<Vector3>{transform.position + Vector3.up};

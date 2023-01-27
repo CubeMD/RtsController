@@ -4,21 +4,26 @@ namespace Economy
 {
     public class EconomyManager : MonoBehaviour
     {
-        public float massAmount;
-        public float energyAmount;
-
         [SerializeField] private float defaultMassAmount;
         [SerializeField] private float defaultEnergyAmount;
-    
+
+        public float MassAmount { get; private set; }
+        public float EnergyAmount { get; private set; }
+
+        private void Awake()
+        {
+            ResetEconomyManager();
+        }
+
         public void ResetEconomyManager()
         {
-            massAmount = defaultMassAmount;
-            energyAmount = defaultEnergyAmount;
+            MassAmount = defaultMassAmount;
+            EnergyAmount = defaultEnergyAmount;
         }
 
         public void UnitCollectedMass(float amount)
         {
-            massAmount += amount;
+            MassAmount += amount;
         }
     }
 }

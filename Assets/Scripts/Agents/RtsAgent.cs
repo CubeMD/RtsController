@@ -69,71 +69,32 @@ namespace Agents
             actionBuffersContinuousActions[0] = 100;
             actionBuffersContinuousActions[1] = 100;
 
-            bool orderActionRecorded = false;
+            const int keypadZeroIndex = (int)KeyCode.Keypad0;
             
-            if (Input.GetKey(KeyCode.Keypad0))
+            for (int i = 0; i < 10; i++)
             {
-                actionBuffersDiscreteActions[0] = 0;
-                orderActionRecorded = true;
-            }
-            else if (Input.GetKey(KeyCode.Keypad1))
-            {
-                actionBuffersDiscreteActions[0] = 1;
-                orderActionRecorded = true;
-            }
-            else if (Input.GetKey(KeyCode.Keypad2))
-            {
-                actionBuffersDiscreteActions[0] = 2;
-                orderActionRecorded = true;
-            }
-            else if (Input.GetKey(KeyCode.Keypad3))
-            {
-                actionBuffersDiscreteActions[0] = 3;
-                orderActionRecorded = true;
-            }
-            else if (Input.GetKey(KeyCode.Keypad4))
-            {
-                actionBuffersDiscreteActions[0] = 4;
-                orderActionRecorded = true;
-            }
-            else if (Input.GetKey(KeyCode.Keypad5))
-            {
-                actionBuffersDiscreteActions[0] = 5;
-                orderActionRecorded = true;
-            }
-            else if (Input.GetKey(KeyCode.Keypad6))
-            {
-                actionBuffersDiscreteActions[0] = 6;
-                orderActionRecorded = true;
-            }
-            else if (Input.GetKey(KeyCode.Keypad7))
-            {
-                actionBuffersDiscreteActions[0] = 7;
-                orderActionRecorded = true;
-            }
-            else if (Input.GetKey(KeyCode.Keypad8))
-            {
-                actionBuffersDiscreteActions[0] = 8;
-                orderActionRecorded = true;
-            }
-            else if (Input.GetKey(KeyCode.Keypad9))
-            {
-                actionBuffersDiscreteActions[0] = 9;
-                orderActionRecorded = true;
-            }
-
-            if (orderActionRecorded)
-            {
-                if (!Input.GetKey(KeyCode.LeftShift))
+                if (Input.GetKey((KeyCode) (keypadZeroIndex + i)))
                 {
-                    actionBuffersDiscreteActions[1] = 0;
+                    actionBuffersDiscreteActions[0] = i;
+                    Debug.Log($"Key {i}");
+                    
+                    if (!Input.GetKey(KeyCode.RightShift))
+                    {
+                        actionBuffersDiscreteActions[1] = 0;
+                        Debug.Log("Shift not pressed");
+                    }
+                    else
+                    {
+                        Debug.Log("Shift is pressed");
+                    }
+                    
+                    Vector3 mouseAction = aiPlayer.matchManager.transform.InverseTransformPoint(
+                        Camera.main.ScreenToWorldPoint(Input.mousePosition)) / aiPlayer.matchManager.halfGroundSize;
+                
+                    actionBuffersContinuousActions[0] = mouseAction.x;
+                    actionBuffersContinuousActions[1] = mouseAction.z;
+                    break;
                 }
-                
-                Vector3 mouseAction = aiPlayer.environment.transform.InverseTransformPoint(
-                    Camera.main.ScreenToWorldPoint(Input.mousePosition)) / aiPlayer.mapManager.halfGroundSize;
-                
-                actionBuffersContinuousActions[0] = mouseAction.x;
-                actionBuffersContinuousActions[1] = mouseAction.z;
             }
         } 
     
@@ -172,9 +133,9 @@ namespace Agents
                 Mathf.Clamp(continuousActions[1], -1f, 1f));
             
             aiPlayer.cursorTransform.localPosition = new Vector3(
-                aiPlayer.mapManager.halfGroundSize * cursorAction.x,
+                aiPlayer.matchManager.halfGroundSize * cursorAction.x,
                 0,
-                aiPlayer.mapManager.halfGroundSize * cursorAction.y);
+                aiPlayer.matchManager.halfGroundSize * cursorAction.y);
             
             
             RtsAgentCommandType rtsAgentCommandType = (RtsAgentCommandType) Mathf.Pow(2, discreteActions[0]);
@@ -288,7 +249,7 @@ namespace Agents
                     float minFoundDistance = float.MaxValue;
                     float currentDistance;
     
-                    foreach (Player playerInEnvironment in aiPlayer.environment.players)
+                    foreach (Player playerInEnvironment in aiPlayer.matchManager.players)
                     {
                         if (playerInEnvironment.teamId != aiPlayer.teamId)
                         {
@@ -326,7 +287,7 @@ namespace Agents
                     float minFoundDistance = float.MaxValue;
                     float currentDistance;
 
-                    foreach (Reclaim reclaim in aiPlayer.mapManager.allReclaim)
+                    foreach (Reclaim reclaim in aiPlayer.matchManager.allReclaim)
                     {
                         currentDistance = Vector3.Distance(reclaim.transform.position, aiPlayer.cursorTransform.position);
 
@@ -358,7 +319,7 @@ namespace Agents
                     float minFoundDistance = float.MaxValue;
                     float currentDistance;
     
-                    foreach (Player playerInEnvironment in aiPlayer.environment.players)
+                    foreach (Player playerInEnvironment in aiPlayer.matchManager.players)
                     {
                         if (playerInEnvironment.teamId == aiPlayer.teamId)
                         {
@@ -391,7 +352,7 @@ namespace Agents
                 List<Unit> capableUnits = aiPlayer.unitManager.selectedUnits.Where(x => x.CanExecuteOrderType(OrderType.BuildFactory)).ToList();
 
                 if (capableUnits.Count > 0 && 
-                    Physics.OverlapBox(aiPlayer.cursorTransform.position, Vector3.one * aiPlayer.unitManager.factoryPrefab.size, Quaternion.identity, aiPlayer.mapManager.spaceLayerMask).Length < 1)
+                    Physics.OverlapBox(aiPlayer.cursorTransform.position, Vector3.one * aiPlayer.unitManager.factoryPrefab.size, Quaternion.identity, aiPlayer.matchManager.spaceLayerMask).Length < 1)
                 {
                     Order order = new Order(OrderType.BuildFactory, capableUnits, aiPlayer.cursorTransform.position);
                     

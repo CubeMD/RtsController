@@ -1,6 +1,6 @@
 ﻿namespace Units.LandUnits
 {
-    public class Engineer : LandUnit
+    public class Engineer : MovableUnit
     {
         
     }

@@ -1,6 +1,6 @@
 ﻿namespace Utilities.StateMachine
 {
-    public class State
+    public abstract class State
     {
         protected StateMachine stateMachine;
 
@@ -16,7 +16,7 @@
 
         public virtual void Terminate()
         {
-            
+            stateMachine.queuedStates.Remove(this);
         }
     }
 }
