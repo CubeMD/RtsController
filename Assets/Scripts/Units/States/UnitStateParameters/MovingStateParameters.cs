@@ -1,6 +1,4 @@
-﻿using UnityEngine;
-
-namespace Units.UnitStates.UnitStateParameters
+﻿namespace Units.States.UnitStateParameters
 {
     [System.Serializable]
     public class MovingUnitParameters

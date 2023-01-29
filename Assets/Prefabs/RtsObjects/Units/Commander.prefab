@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 4814873869992764152}
   - component: {fileID: 4095272108368627221}
   - component: {fileID: 1837536768540015019}
+  - component: {fileID: 2828149435030906605}
   - component: {fileID: -1284152987622185316}
   m_Layer: 6
   m_Name: Commander
@@ -127,18 +128,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 552e0ff214534a7c91d81b585775eaf7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  owner: {fileID: 0}
+  stateMachine: {fileID: 2828149435030906605}
   orderCapability: 79
   unitType: 0
-  mesh: {fileID: 0}
-  render: {fileID: 1278035412397534460}
-  renderOrderLines: 1
-  lineRenderer: {fileID: -1284152987622185316}
   movingUnitParameters:
-    movementSpeed: 0
+    movementSpeed: 5
   reclaimingUnitParameters:
     reclaimRange: 5
     reclaimPower: 10
+--- !u!114 &2828149435030906605
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1059499268272263220}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b75cb3ded4d347acbde5a594df4090a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  renderAllStatesVisuals: 1
+  lineRenderer: {fileID: -1284152987622185316}
 --- !u!120 &-1284152987622185316
 LineRenderer:
   m_ObjectHideFlags: 0

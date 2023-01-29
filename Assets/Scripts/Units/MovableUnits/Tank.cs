@@ -1,4 +1,4 @@
-﻿namespace Units.LandUnits
+﻿namespace Units.MovableUnits
 {
     public class Tank : MovableUnit
     {

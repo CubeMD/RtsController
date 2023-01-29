@@ -177,6 +177,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: MatchManager
       objectReference: {fileID: 0}
+    - target: {fileID: 8845511785750639622, guid: 59d61722a5eacea44b5a52fe2ecb3ee3, type: 3}
+      propertyPath: matchDurationSeconds
+      value: 300
+      objectReference: {fileID: 0}
     - target: {fileID: 8845511785750639623, guid: 59d61722a5eacea44b5a52fe2ecb3ee3, type: 3}
       propertyPath: m_RootOrder
       value: 5

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Orders;
+using Interfaces;
 using Players;
 using Units;
 using Unity.MLAgents.Actuators;
@@ -89,7 +89,7 @@ namespace Agents
                     }
                     
                     Vector3 mouseAction = aiPlayer.matchManager.transform.InverseTransformPoint(
-                        Camera.main.ScreenToWorldPoint(Input.mousePosition)) / aiPlayer.matchManager.halfGroundSize;
+                        Camera.main.ScreenToWorldPoint(Input.mousePosition)) / aiPlayer.matchManager.HalfGroundSize;
                 
                     actionBuffersContinuousActions[0] = mouseAction.x;
                     actionBuffersContinuousActions[1] = mouseAction.z;
@@ -133,9 +133,9 @@ namespace Agents
                 Mathf.Clamp(continuousActions[1], -1f, 1f));
             
             aiPlayer.cursorTransform.localPosition = new Vector3(
-                aiPlayer.matchManager.halfGroundSize * cursorAction.x,
+                aiPlayer.matchManager.HalfGroundSize * cursorAction.x,
                 0,
-                aiPlayer.matchManager.halfGroundSize * cursorAction.y);
+                aiPlayer.matchManager.HalfGroundSize * cursorAction.y);
             
             
             RtsAgentCommandType rtsAgentCommandType = (RtsAgentCommandType) Mathf.Pow(2, discreteActions[0]);
@@ -153,35 +153,37 @@ namespace Agents
 
         private void PerformUnitSelectionCommand(RtsAgentCommandType rtsAgentCommandType, bool shiftCommand)
         {
+            UnitManager unitManager = aiPlayer.unitManager;
+            
             if (!shiftCommand)
             {
-                aiPlayer.unitManager.selectedUnits.Clear();
+                unitManager.SelectedUnits.Clear();
             }
-
+            
             if (rtsAgentCommandType == RtsAgentCommandType.SelectClosestUnit)
             {
                 Unit targetUnit = null;
                 float minFoundDistance = float.MaxValue;
                 float currentDistance;
 
-                foreach (Unit aiPlayerOwnedUnit in aiPlayer.unitManager.ownedUnits)
+                foreach (Unit aiPlayerOwnedUnit in unitManager.OwnedUnits)
                 {
                     currentDistance = Vector3.Distance(aiPlayerOwnedUnit.transform.position, aiPlayer.cursorTransform.position);
 
-                    if (currentDistance < minFoundDistance && !aiPlayer.unitManager.selectedUnits.Contains(aiPlayerOwnedUnit))
+                    if (currentDistance < minFoundDistance && !unitManager.SelectedUnits.Contains(aiPlayerOwnedUnit))
                     {
                         minFoundDistance = currentDistance;
                         targetUnit = aiPlayerOwnedUnit;
                     }
                 }
                 
-                aiPlayer.unitManager.selectedUnits.Add(targetUnit);
+                unitManager.AddSelectedUnit(targetUnit);
             }
             else
             {
                 List<Unit> ownedUnitsInArea = new List<Unit>();
                 
-                foreach (Unit aiPlayerOwnedUnit in aiPlayer.unitManager.ownedUnits)
+                foreach (Unit aiPlayerOwnedUnit in unitManager.OwnedUnits)
                 {
                     if (aiPlayerOwnedUnit.transform.position.x <= aiPlayer.cursorTransform.position.x + selectionAreaSize &&
                         aiPlayerOwnedUnit.transform.position.x >= aiPlayer.cursorTransform.position.x - selectionAreaSize &&
@@ -194,7 +196,7 @@ namespace Agents
 
                 if (rtsAgentCommandType == RtsAgentCommandType.SelectUnitsInArea)
                 {
-                    aiPlayer.unitManager.selectedUnits.AddRange(ownedUnitsInArea.Where(x => !aiPlayer.unitManager.selectedUnits.Contains(x)));
+                    unitManager.AddSelectedUnits(ownedUnitsInArea);
                 }
                 else if (rtsAgentCommandType == RtsAgentCommandType.SelectUnitsOfClosestUnitTypeInArea)
                 {
@@ -215,9 +217,7 @@ namespace Agents
 
                     if (targetUnit != null)
                     {
-                        aiPlayer.unitManager.selectedUnits.AddRange(ownedUnitsInArea.Where(x => 
-                            x.unitType == targetUnit.unitType && 
-                            !aiPlayer.unitManager.selectedUnits.Contains(x)));
+                        unitManager.AddSelectedUnits(ownedUnitsInArea.Where(x => x.UnitType == targetUnit.UnitType).ToList());
                     }
                 }
             }
@@ -227,19 +227,20 @@ namespace Agents
         {
             if (rtsAgentCommandType == RtsAgentCommandType.Move)
             {
-                List<Unit> capableUnits = aiPlayer.unitManager.selectedUnits.Where(x => x.CanExecuteOrderType(OrderType.Move)).ToList();
-                
-                if (capableUnits.Count > 0)
+                List<Unit> capableUnits = aiPlayer.unitManager.GetSelectedUnitsByOrder(OrderType.Move);
+
+                foreach (Unit unit in capableUnits)
                 {
-                    Order order = new Order(OrderType.Move, capableUnits, aiPlayer.cursorTransform.position);
-                    
-                    foreach (Unit capableUnit in capableUnits)
+                    if (!(unit is IMove movableUnit))
                     {
-                        capableUnit.AssignOrder(order, shiftCommand);
+                        Debug.LogError("Something is off. Non-movable unit can execute move order type");
+                        continue;
                     }
+                    
+                    movableUnit.Move(aiPlayer.cursorTransform.position, shiftCommand);
                 }
             }
-            else if (rtsAgentCommandType == RtsAgentCommandType.Attack)
+            /*else if (rtsAgentCommandType == RtsAgentCommandType.Attack)
             {
                 List<Unit> capableUnits = aiPlayer.unitManager.selectedUnits.Where(x => x.CanExecuteOrderType(OrderType.Attack)).ToList();
                 
@@ -276,40 +277,30 @@ namespace Agents
                         }
                     }
                 }
-            }
+            }*/
             else if (rtsAgentCommandType == RtsAgentCommandType.Reclaim)
             {
-                List<Unit> capableUnits = aiPlayer.unitManager.selectedUnits.Where(x => x.CanExecuteOrderType(OrderType.Reclaim)).ToList();
+                List<Unit> capableUnits = aiPlayer.unitManager.GetSelectedUnitsByOrder(OrderType.Reclaim);
                 
                 if (capableUnits.Count > 0)
                 {
-                    Reclaim targetReclaim = null;
-                    float minFoundDistance = float.MaxValue;
-                    float currentDistance;
-
-                    foreach (Reclaim reclaim in aiPlayer.matchManager.allReclaim)
+                    if (aiPlayer.matchManager.TryGetClosesReclaimToPosition(aiPlayer.cursorTransform.position,
+                            out Reclaim closestReclaim))
                     {
-                        currentDistance = Vector3.Distance(reclaim.transform.position, aiPlayer.cursorTransform.position);
-
-                        if (currentDistance < minFoundDistance)
-                        {
-                            minFoundDistance = currentDistance;
-                            targetReclaim = reclaim;
-                        }
-                    }
-
-                    if (targetReclaim != null)
-                    {
-                        Order order = new TargetedOrder(OrderType.Reclaim, capableUnits, targetReclaim.transform);
-                    
                         foreach (Unit capableUnit in capableUnits)
                         {
-                            capableUnit.AssignOrder(order, shiftCommand);
+                            if (!(capableUnit is IReclaim engineer))
+                            {
+                                Debug.LogError("Something is off. Non-engineering unit can execute reclaim order type");
+                                continue;
+                            }
+                            
+                            engineer.Reclaim(closestReclaim, shiftCommand);
                         }
                     }
                 }
             }
-            else if (rtsAgentCommandType == RtsAgentCommandType.Assist)
+            /*else if (rtsAgentCommandType == RtsAgentCommandType.Assist)
             {
                 List<Unit> capableUnits = aiPlayer.unitManager.selectedUnits.Where(x => x.CanExecuteOrderType(OrderType.Assist)).ToList();
 
@@ -346,40 +337,43 @@ namespace Agents
                         }
                     }
                 }
-            }
-            else if (rtsAgentCommandType == RtsAgentCommandType.BuildFactoryUnit)
-            {
-                List<Unit> capableUnits = aiPlayer.unitManager.selectedUnits.Where(x => x.CanExecuteOrderType(OrderType.BuildFactory)).ToList();
+            }*/
+             else if (rtsAgentCommandType == RtsAgentCommandType.BuildFactoryUnit)
+             {
+                 List<Unit> capableUnits = aiPlayer.unitManager.GetSelectedUnitsByOrder(OrderType.BuildFactory);
 
-                if (capableUnits.Count > 0 && 
-                    Physics.OverlapBox(aiPlayer.cursorTransform.position, Vector3.one * aiPlayer.unitManager.factoryPrefab.size, Quaternion.identity, aiPlayer.matchManager.spaceLayerMask).Length < 1)
-                {
-                    Order order = new Order(OrderType.BuildFactory, capableUnits, aiPlayer.cursorTransform.position);
-                    
-                    foreach (Unit capableUnit in capableUnits)
-                    {
-                        capableUnit.AssignOrder(order, shiftCommand);
-                    }
-                }
-            }
-            else if (rtsAgentCommandType == RtsAgentCommandType.BuildTankUnit)
-            {
-                foreach (Unit capableUnit in aiPlayer.unitManager.selectedUnits.Where(x => x.CanExecuteOrderType(OrderType.BuildTank)))
-                {
-                    Order order = new TargetedOrder(OrderType.BuildTank, new List<Unit>{capableUnit}, capableUnit.transform);
-                        
-                    capableUnit.AssignOrder(order, shiftCommand);
-                }
-            }
-            else if (rtsAgentCommandType == RtsAgentCommandType.BuildEngineerUnit)
-            {
-                foreach (Unit capableUnit in aiPlayer.unitManager.selectedUnits.Where(x => x.CanExecuteOrderType(OrderType.BuildEngineer)))
-                {
-                    Order order = new TargetedOrder(OrderType.BuildEngineer, new List<Unit>{capableUnit}, capableUnit.transform);
-                        
-                    capableUnit.AssignOrder(order, shiftCommand);
-                }
-            }
+                 if (capableUnits.Count > 0 && aiPlayer.unitManager.CanBuildUnitTypeAtPosition(UnitType.Factory, aiPlayer.cursorTransform.position))
+                 {
+                     foreach (Unit capableUnit in capableUnits)
+                     {
+                         if (!(capableUnit is IBuild engineer))
+                         {
+                             Debug.LogError("Something is off. Non-engineering unit can execute build factory order type");
+                             continue;
+                         }
+                            
+                         engineer.Build(UnitType.Factory, aiPlayer.cursorTransform.position, shiftCommand);
+                     }
+                 }
+             }
+             // else if (rtsAgentCommandType == RtsAgentCommandType.BuildTankUnit)
+             // {
+             //     foreach (Unit capableUnit in aiPlayer.unitManager.selectedUnits.Where(x => x.CanExecuteOrderType(OrderType.BuildTank)))
+             //     {
+             //         Order order = new TargetedOrder(OrderType.BuildTank, new List<Unit>{capableUnit}, capableUnit.transform);
+             //             
+             //         capableUnit.AssignOrder(order, shiftCommand);
+             //     }
+             // }
+             // else if (rtsAgentCommandType == RtsAgentCommandType.BuildEngineerUnit)
+             // {
+             //     foreach (Unit capableUnit in aiPlayer.unitManager.selectedUnits.Where(x => x.CanExecuteOrderType(OrderType.BuildEngineer)))
+             //     {
+             //         Order order = new TargetedOrder(OrderType.BuildEngineer, new List<Unit>{capableUnit}, capableUnit.transform);
+             //             
+             //         capableUnit.AssignOrder(order, shiftCommand);
+             //     }
+             // }
         }
     }
 }

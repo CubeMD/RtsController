@@ -4,11 +4,12 @@ using UnityEngine;
 
 public class Timer
 {
-    public readonly float duration;
-    public float timeLeft;
-    
+    private readonly float duration;
     private readonly MonoBehaviour owner;
     private readonly Action callback;
+    public float TimerPercentage => timeLeft / duration;
+    
+    private float timeLeft;
     private Coroutine timerRoutine;
 
     public Timer(MonoBehaviour owner, float duration, Action callback)

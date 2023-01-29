@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using Agents;
-using Orders;
+using Systems.StateMachine;
 using Units;
 using Unity.MLAgents;
 using UnityEngine;
@@ -28,27 +28,23 @@ namespace Players
         private void GetAgentEnvironmentObservation()
         {
             Monitor.RemoveAllValuesFromAllTransforms();
-        
-            float time = matchManager.matchTimer.timeLeft / matchManager.matchTimer.duration;
-
+            
             float[] vectorObservations =
             {
-                time
+                matchManager.TimerPercentage
             };
-
-
+            
             List<List<float[]>> observations = new List<List<float[]>>
             {
                 new List<float[]>(),
                 new List<float[]>()
             };
-        
 
-            var colliders = Physics.OverlapBox(matchManager.transform.position, Vector3.one * matchManager.halfGroundSize, Quaternion.identity, matchManager.spaceLayerMask);
+            Collider[] colliders = Physics.OverlapBox(matchManager.transform.position, Vector3.one * matchManager.HalfGroundSize, Quaternion.identity, matchManager.SpaceLayerMask);
         
             foreach (Collider col in colliders)
             {
-                Vector3 relNormPos = matchManager.transform.InverseTransformPoint(col.transform.position) / matchManager.halfGroundSize;
+                Vector3 relNormPos = matchManager.transform.InverseTransformPoint(col.transform.position) / matchManager.HalfGroundSize;
             
                 List<float> interactableObservation = new List<float>
                 {
@@ -69,27 +65,41 @@ namespace Players
                 }
                 else if (col.TryGetComponent(out Unit unit))
                 {
-                    interactableObservation.Add(unit.assignedOrders.Count / 2f);
-                    interactableObservation.Add(unitManager.selectedUnits.Contains(unit) ? 1 : 0);
+                    interactableObservation.Add(unit.StateMachine.QueueAmount / 2f);
+                    interactableObservation.Add(unitManager.SelectedUnits.Contains(unit) ? 1 : 0);
 
-                    if (unit.assignedOrders.Count > 0)
+                    State current = unit.StateMachine.GetActiveState();
+                    State last = unit.StateMachine.LastState;
+
+                    if (current == null || current is EmptyState)
                     {
-                        Vector3 firstOrderPos = matchManager.transform.InverseTransformPoint(unit.assignedOrders[0].Position) / matchManager.halfGroundSize;
-
-                        interactableObservation.AddRange(new List<float> {firstOrderPos.x, firstOrderPos.z, 1});
+                        // If there are no current & last states
+                        // Adds 2 zero vector observations for current and last states
+                        addZeroVectorObservation();
+                        addZeroVectorObservation();
                     }
                     else
                     {
-                        interactableObservation.AddRange(new List<float> {0, 0, 0});
+                        addStatePositionObservation(current);
+
+                        if (last == null || last is EmptyState || last == current)
+                        {
+                            // Adds zero vector observation for the last state
+                            addZeroVectorObservation();
+                        }
+                        else
+                        {
+                            addStatePositionObservation(last);
+                        }
                     }
-                    
-                    if (unit.assignedOrders.Count > 1)
+
+                    void addStatePositionObservation(State state)
                     {
-                        Vector3 lastOrderPos = matchManager.transform.InverseTransformPoint(unit.assignedOrders[unit.assignedOrders.Count - 1].Position) / matchManager.halfGroundSize;
-                            
-                        interactableObservation.AddRange(new List<float> {lastOrderPos.x, lastOrderPos.z, 1});
+                        Vector3 posObservation = matchManager.transform.InverseTransformPoint(state.GetStatePosition()) / matchManager.HalfGroundSize;
+                        interactableObservation.AddRange(new List<float> {posObservation.x, posObservation.z, 1});
                     }
-                    else
+
+                    void addZeroVectorObservation()
                     {
                         interactableObservation.AddRange(new List<float> {0, 0, 0});
                     }
@@ -106,8 +116,6 @@ namespace Players
 
             currentObservation = new RtsAgentObservation(vectorObservations, observations);
         }
-
-
         
         public void FixedUpdate()
         {

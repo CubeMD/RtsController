@@ -1,15 +1,26 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using Economy;
 using Interfaces;
-using Orders;
 using Players;
+using Systems.StateMachine;
+using Units.States.UnitStateParameters;
 using UnityEngine;
 using Utilities;
-using Utilities.StateMachine;
 
 namespace Units
 {
+    [Flags]
+    public enum OrderType
+    {
+        Move = 1,
+        Attack = 2,
+        Reclaim = 4,
+        Assist = 8,
+        BuildTank = 16,
+        BuildEngineer = 32,
+        BuildFactory = 64,
+    }
+    
     public enum UnitType
     {
         Commander,
@@ -18,43 +29,77 @@ namespace Units
         Factory
     }
     
+    [RequireComponent(typeof(StateMachine))]
     public class Unit : MonoBehaviour, IDestroyable
     {
         public event Action<IDestroyable> OnDestroyableDestroy;
+        public event Action<Unit> OnUnitDestroyed;
         
-        public Player owner;
-        public StateMachine stateMachine = new StateMachine();
-        public OrderType orderCapability;
-        public UnitType unitType;
+        [SerializeField] protected StateMachine stateMachine;
+        [SerializeField] private OrderType orderCapability;
+        [SerializeField] private UnitType unitType;
+        public UnitType UnitType => unitType;
+        public StateMachine StateMachine => stateMachine;
         
-        [SerializeField] private Mesh mesh;
-        [SerializeField] private Renderer render;
-        [SerializeField] private bool renderOrderLines;
-        [SerializeField] private LineRenderer lineRenderer;
+        public Player Owner { get; private set; }
 
-        public readonly List<Order> assignedOrders = new List<Order>();
-        public Order executedOrder;
+        [SerializeField] private float size;
 
-        public void Update()
+        public float Size => size;
+        [SerializeField] private float energyCost;
+        [SerializeField] private float massCost;
+        [SerializeField] private float maxHp;
+        
+        [SerializeField] private float currentHp;
+
+        public float CurrentHp
         {
-            stateMachine.Step();
-
-            if (renderOrderLines)
+            get => currentHp;
+            set
             {
-                RenderOrderLines();
+                if (value <= 0)
+                {
+                    DestroyUnit();
+                }
+                else
+                {
+                    currentHp = value;
+                }
+            }
+        }
+
+        [SerializeField] private float constructionPercentage;
+
+        public bool IsConstructionComplete => constructionPercentage == 1f;
+
+        public void SetOwner(Player owner)
+        {
+            this.Owner = owner;
+        }
+        
+        protected void AssignState(State state, bool queue)
+        {
+            if (queue)
+            {
+                stateMachine.QueueState(state);
+            }
+            else
+            {
+                stateMachine.SetActiveState(state);
             }
         }
 
         public bool CanExecuteOrderType(OrderType orderType)
         {
-            return orderCapability.HasFlag(orderType);
+            return IsConstructionComplete && orderCapability.HasFlag(orderType);
         }
         
         public void DestroyUnit()
         {
-            UnAssignUnitFromAllOrders();
+            stateMachine.TerminateAllStates();
             OnDestroyableDestroy?.Invoke(this);
             ObjectPooler.PoolGameObject(gameObject);
+            OnUnitDestroyed?.Invoke(this);
         }
         
         public GameObject GetGameObject()
@@ -62,54 +107,21 @@ namespace Units
             return gameObject;
         }
 
-        public void UnAssignUnitFromAllOrders()
+        public void ForceCompleteConstruction()
         {
-            foreach (Order assignedOrder in assignedOrders)
+            constructionPercentage = 1f;
+            currentHp = maxHp;
+        }
+
+        public void Construct(EngineerParameters engineerParameters, EconomyManager economyManager)
+        {
+            constructionPercentage += 0.01f * Time.deltaTime;
+            currentHp += 0.01f * Time.deltaTime;
+
+            if (constructionPercentage >= 1f)
             {
-                assignedOrder.assignedUnits.Remove(this);
+                ForceCompleteConstruction();
             }
-            
-            assignedOrders.Clear();
-        }
-        
-        public void AssignOrder(Order order, bool additive)
-        {
-            if (!additive)
-            {
-                UnAssignUnitFromAllOrders();
-            }
-        
-            assignedOrders.Add(order);
-
-            if (assignedOrders.Count == 1)
-            {
-                StartExecutingFirstOrder();
-            }
-        }
-
-        public void UnAssignOrder(Order order)
-        {
-            int orderIndex = assignedOrders.IndexOf(order);
-            
-            order.assignedUnits.RemoveAt(orderIndex);
-            assignedOrders.Remove(order);
-            
-            StartExecutingFirstOrder();
-        }
-        
-        public virtual void StartExecutingFirstOrder()
-        {
-            stateMachine.queuedStates.Clear();
-        }
-
-        private void RenderOrderLines()
-        {
-            List<Vector3> points = new List<Vector3>{transform.position + Vector3.up};
-
-            assignedOrders.ForEach(x => points.Add(x.Position + Vector3.up));
-
-            lineRenderer.positionCount = points.Count;
-            lineRenderer.SetPositions(points.ToArray());
         }
     }
 }
