@@ -11,7 +11,7 @@ namespace Systems.Environment
     {
         [StaticDomainReloadField]
         public static event Action<MassGenerator> OnAllMassCollected;
-        
+
         private readonly List<Mass> spawnedMass = new List<Mass>();
         
         private void Awake()
@@ -39,7 +39,7 @@ namespace Systems.Environment
                     0,
                     Random.Range(-halfGroundSize.y, halfGroundSize.y));
                 
-                Mass mass = ObjectPooler.Instantiate(EnvironmentGlobalSettings.Mass, transform.localPosition + generatedLocalPosition, Quaternion.identity, transform);
+                Mass mass = ObjectPooler.Instantiate(EnvironmentGlobalSettings.Mass, transform.localPosition + generatedLocalPosition, Quaternion.identity);
                 spawnedMass.Add(mass);
                 mass.GenerateRandomMassAmount();
             }
