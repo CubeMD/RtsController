@@ -7,7 +7,7 @@ using Utilities;
 
 namespace Units
 {
-    public class UnitManager : MonoBehaviour, ISerializationCallbackReceiver
+    public class UnitManager : MonoBehaviour
     {
         [Serializable]
         private class UnitPrefabGroup
@@ -21,12 +21,29 @@ namespace Units
         
         public List<Unit> OwnedUnits { get; } = new List<Unit>();
         public List<Unit> SelectedUnits { get; } = new List<Unit>();
+        public List<Unit> GhostUnits { get; } = new List<Unit>();
 
         private readonly Dictionary<UnitType, Unit> unitPrefabTable = new Dictionary<UnitType, Unit>();
 
+        private void Awake()
+        {
+            unitPrefabTable.Clear();
+
+            foreach (UnitPrefabGroup group in unitPrefabGroups)
+            {
+                if (unitPrefabTable.ContainsKey(group.unitType))
+                {
+                    Debug.Log("Unit with the same type already exists in the table");
+                    continue;
+                }
+               
+                unitPrefabTable.Add(group.unitType, group.unitPrefab);
+            }
+        }
+
         public void AddSelectedUnit(Unit unit)
         {
-            if (!unit.IsConstructionComplete || SelectedUnits.Contains(unit))
+            if (!unit.IsConstructed || SelectedUnits.Contains(unit))
             {
                 return;
             }
@@ -62,24 +79,68 @@ namespace Units
             }
         }
 
-        public Unit SpawnUnit(UnitType unitType, Vector3 position, bool completed = false)
+        public Unit PlaceUnitGhost(UnitType unitType, Vector3 position)
         {
-            Unit unit = ObjectPooler.InstantiateGameObject(unitPrefabTable[unitType], position, Quaternion.identity, transform);
-            unit.OnUnitDestroyed += HandleUnitDestroyed;
-            unit.SetOwner(player);
-            
-            if (completed)
+            if (TryGetUnitPrefabByUnitType(unitType, out Unit prefab))
             {
-                unit.ForceCompleteConstruction();
+                Unit unit = ObjectPooler.InstantiateGameObject(prefab, position, Quaternion.identity, transform);
+                GhostUnits.Add(unit);
+                unit.DisableUnit();
+                return unit;
             }
+
+            return null;
+        }
+
+        public void EnableUnit(Unit unit, bool forceConstructed = false)
+        {
+            if (GhostUnits.Contains(unit))
+            {
+                unit.OnUnitDestroyed += HandleUnitDestroyed;
+                unit.EnableUnit();
+                unit.SetOwner(player);
             
-            OwnedUnits.Add(unit);
-            return unit;
+                if (forceConstructed)
+                {
+                    unit.ForceConstructed();
+                }
+                else
+                {
+                    unit.StartConstruction();
+                }
+            
+                OwnedUnits.Add(unit);
+                GhostUnits.Remove(unit);
+            }
+        }
+        
+        public Unit SpawnUnit(UnitType unitType, Vector3 position, bool forceConstructed = false)
+        {
+            if (TryGetUnitPrefabByUnitType(unitType, out Unit prefab))
+            {
+                Unit unit = ObjectPooler.InstantiateGameObject(prefab, position, Quaternion.identity, transform);
+                unit.OnUnitDestroyed += HandleUnitDestroyed;
+                unit.SetOwner(player);
+            
+                if (forceConstructed)
+                {
+                    unit.ForceConstructed();
+                }
+                else
+                {
+                    unit.StartConstruction();
+                }
+            
+                OwnedUnits.Add(unit);
+                return unit;
+            }
+
+            return null;
         }
 
         public void SpawnCommander()
         {
-            SpawnUnit(UnitType.Commander, player.startingPosition);
+            SpawnUnit(UnitType.Commander, player.startingPosition, true);
         }
 
         private void HandleUnitDestroyed(Unit unit)
@@ -124,23 +185,5 @@ namespace Units
             Debug.LogError($"Requested prefab for non-registered unit type {unitType}");
             return false;
         }
-        
-        public void OnBeforeSerialize()
-        {
-           unitPrefabTable.Clear();
-
-           foreach (UnitPrefabGroup group in unitPrefabGroups)
-           {
-               if (unitPrefabTable.ContainsKey(group.unitType))
-               {
-                   Debug.Log("Unit with the same type already exists in the table");
-                   continue;
-               }
-               
-               unitPrefabTable.Add(group.unitType, group.unitPrefab);
-           }
-        }
-
-        public void OnAfterDeserialize() { }
     }
 }

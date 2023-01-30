@@ -1,41 +1,52 @@
-﻿using Units.Buildings;
-using Units.MovableUnits;
+﻿using Units.MovableUnits;
 using Units.States.UnitStateParameters;
 using UnityEngine;
-using Utilities;
 
 namespace Units.States
 {
     public class UnitPlacementState : MoveState
     {
-        private readonly UnitType buildingUnitType;
+        private readonly Engineer ownerEngineer;
         private readonly EngineerParameters engineerParameters;
+        private readonly UnitType buildingUnitType;
+        private readonly UnitManager manager;
+        private Unit ghostUnit;
 
-        public UnitPlacementState(MovableUnit owner, UnitType unitType, Vector3 targetPosition, MovingUnitParameters movingUnitParameters, EngineerParameters engineerParameters) : base(owner, targetPosition, movingUnitParameters)
+        protected override float StoppingDistance => engineerParameters.Range;
+
+        public UnitPlacementState(Engineer owner, UnitType unitType, Vector3 targetPosition, MovingUnitParameters movingUnitParameters, EngineerParameters engineerParameters) : base(owner, targetPosition, movingUnitParameters)
         {
-            this.buildingUnitType = unitType;
+            ownerEngineer = owner;
             this.engineerParameters = engineerParameters;
+            buildingUnitType = unitType;
+            manager = ownerEngineer.Owner.unitManager;
         }
-        
+
+        public override void OnBeginState()
+        {
+            base.OnBeginState();
+            
+            if (!manager.CanBuildUnitTypeAtPosition(buildingUnitType, TargetPosition))
+            {
+                TerminateState();
+            }
+
+            ghostUnit = manager.PlaceUnitGhost(buildingUnitType, TargetPosition);
+        }
+
         public override void Update()
         {
+            if (ghostUnit == null)
+            {
+                TerminateState();
+            }
+            
             if (!TryMoveUnit())
             {
-                Unit buildingUnit = owner.Owner.unitManager.SpawnUnit(buildingUnitType, TargetPosition);
-                
-                
-                if (buildingUnit == null)
-                {
-                    
-                }
-                else if (buildingUnit.IsConstructionComplete)
-                {
-                    TerminateState();
-                }
-                else
-                {
-                    buildingUnit.Construct(engineerParameters, owner.Owner.economyManager);
-                }
+                manager.EnableUnit(ghostUnit);
+                ownerEngineer.ConstructUnit(ghostUnit);
+
+                TerminateState();
             }
         }
     }

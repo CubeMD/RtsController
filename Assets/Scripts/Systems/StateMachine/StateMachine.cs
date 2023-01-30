@@ -128,13 +128,18 @@ namespace Systems.StateMachine
         /// Terminates the active State, sets the given State to active immediately and clears the State queue.
         /// </summary>
         /// <param name="state">State to set active</param>
-        public virtual void SetActiveState(State state)
+        /// <param name="clearQueue">If true, will clear the state and assign this state as last added</param>
+        public virtual void SetActiveState(State state, bool clearQueue = true)
         {
-            stateQueue.Clear();
-            lastAddedState = state;
+            if (clearQueue)
+            {
+                stateQueue.Clear();
+                lastAddedState = state;
+            }
+            
             TransitionState(state, true);
         }
-        
+
         /// <summary>
         /// Terminates the current active State and makes the given State active
         /// </summary>

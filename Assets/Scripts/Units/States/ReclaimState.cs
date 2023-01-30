@@ -9,7 +9,7 @@ namespace Units.States
         private readonly Reclaim reclaim;
         private readonly EngineerParameters engineerParameters;
 
-        protected override float StoppingDistance => engineerParameters.range;
+        protected override float StoppingDistance => engineerParameters.Range;
 
         public ReclaimState(MovableUnit owner, 
             Reclaim reclaim, 
@@ -33,7 +33,7 @@ namespace Units.States
             
             if (!TryMoveUnit())
             {
-                float remainingReclaim = Mathf.Max(reclaim.Amount - engineerParameters.power * Time.deltaTime, 0);
+                float remainingReclaim = Mathf.Max(reclaim.Amount - engineerParameters.Power * Time.deltaTime, 0);
                 float reclaimAmount = reclaim.Amount - remainingReclaim;
                 reclaim.Amount = remainingReclaim;
             

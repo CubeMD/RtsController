@@ -1,0 +1,112 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &8921481757061563771
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1185853140769544833, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_Name
+      value: Unit_Engineer
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_RootOrder
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 2.93
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853140769544862, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1185853141826715233, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 914b1118d09ddfa40905e9867fde3a85, type: 2}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+--- !u!1 &7762947116826222586 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1185853140769544833, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+  m_PrefabInstance: {fileID: 8921481757061563771}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &7762947116826222567 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1185853140769544860, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+  m_PrefabInstance: {fileID: 8921481757061563771}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7762947116826222586}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b75cb3ded4d347acbde5a594df4090a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!23 &7762947115769461530 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 1185853141826715233, guid: 3d1b0ecffe845994f874e92d36006aa4, type: 3}
+  m_PrefabInstance: {fileID: 8921481757061563771}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2020836247
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7762947116826222586}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c805a13d3f44e4581b46aa27f9064d9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  stateMachine: {fileID: 7762947116826222567}
+  orderCapability: 79
+  unitType: 1
+  size: 1
+  statParameters:
+    energyCost: 0
+    massCost: 0
+    maxHp: 50
+  activeMaterial: {fileID: 2100000, guid: 914b1118d09ddfa40905e9867fde3a85, type: 2}
+  disableMaterial: {fileID: 2100000, guid: fbace63c38397514dbb8b882fa5db09c, type: 2}
+  meshRenderer: {fileID: 7762947115769461530}
+  movingUnitParameters:
+    movementSpeed: 4
+  engineerParameters:
+    range: 1
+    power: 5

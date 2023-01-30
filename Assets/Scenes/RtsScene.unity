@@ -173,6 +173,34 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 433345546502198548, guid: 59d61722a5eacea44b5a52fe2ecb3ee3, type: 3}
+      propertyPath: unitPrefabGroups.Array.size
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 433345546502198548, guid: 59d61722a5eacea44b5a52fe2ecb3ee3, type: 3}
+      propertyPath: unitPrefabGroups.Array.data[0].unitType
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 433345546502198548, guid: 59d61722a5eacea44b5a52fe2ecb3ee3, type: 3}
+      propertyPath: unitPrefabGroups.Array.data[1].unitType
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 433345546502198548, guid: 59d61722a5eacea44b5a52fe2ecb3ee3, type: 3}
+      propertyPath: unitPrefabGroups.Array.data[2].unitType
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 433345546502198548, guid: 59d61722a5eacea44b5a52fe2ecb3ee3, type: 3}
+      propertyPath: unitPrefabGroups.Array.data[0].unitPrefab
+      value: 
+      objectReference: {fileID: 5802970376628627416, guid: cb02269076a34aa4aad9c4def2996041, type: 3}
+    - target: {fileID: 433345546502198548, guid: 59d61722a5eacea44b5a52fe2ecb3ee3, type: 3}
+      propertyPath: unitPrefabGroups.Array.data[1].unitPrefab
+      value: 
+      objectReference: {fileID: 2020836247, guid: 609aefc91f200ea47a45bf01ed68ed3b, type: 3}
+    - target: {fileID: 433345546502198548, guid: 59d61722a5eacea44b5a52fe2ecb3ee3, type: 3}
+      propertyPath: unitPrefabGroups.Array.data[2].unitPrefab
+      value: 
+      objectReference: {fileID: 6448566039241773200, guid: aca99990e6b819d4fbaf56b9a83e568a, type: 3}
     - target: {fileID: 8845511785750639621, guid: 59d61722a5eacea44b5a52fe2ecb3ee3, type: 3}
       propertyPath: m_Name
       value: MatchManager

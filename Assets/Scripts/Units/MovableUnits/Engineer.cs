@@ -18,5 +18,12 @@ namespace Units.MovableUnits
         {
             AssignState(new UnitPlacementState(this, unitType, position, movingUnitParameters, engineerParameters), queue);
         }
+        
+        public void ConstructUnit(Unit unitUnderConstruction)
+        {
+            // We are passing false to clear queue to keep the queue and set UnitConstructionState as the active state
+            // Done to keep scheduled states as they are and insert construction right after unit placement state
+            stateMachine.SetActiveState(new UnitConstructionState(this, unitUnderConstruction, engineerParameters, movingUnitParameters), false);
+        }
     }
 }

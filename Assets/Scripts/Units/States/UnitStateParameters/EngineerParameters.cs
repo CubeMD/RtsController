@@ -1,9 +1,14 @@
-﻿namespace Units.States.UnitStateParameters
+﻿using UnityEngine;
+
+namespace Units.States.UnitStateParameters
 {
     [System.Serializable]
     public class EngineerParameters
     {
-        public float range;
-        public float power;
+        [SerializeField] private float range;
+        public float Range => range;
+
+        [SerializeField] private float power;
+        public float Power => power;
     }
 }

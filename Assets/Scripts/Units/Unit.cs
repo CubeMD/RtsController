@@ -1,8 +1,8 @@
 ﻿using System;
-using Economy;
 using Interfaces;
 using Players;
 using Systems.StateMachine;
+using Units.States;
 using Units.States.UnitStateParameters;
 using UnityEngine;
 using Utilities;
@@ -36,45 +36,28 @@ namespace Units
         public event Action<Unit> OnUnitDestroyed;
         
         [SerializeField] protected StateMachine stateMachine;
-        [SerializeField] private OrderType orderCapability;
-        [SerializeField] private UnitType unitType;
-        public UnitType UnitType => unitType;
         public StateMachine StateMachine => stateMachine;
         
-        public Player Owner { get; private set; }
-
-        [SerializeField] private float size;
-
-        public float Size => size;
-        [SerializeField] private float energyCost;
-        [SerializeField] private float massCost;
-        [SerializeField] private float maxHp;
+        [SerializeField] private OrderType orderCapability;
         
-        [SerializeField] private float currentHp;
+        [SerializeField] private UnitType unitType;
+        public UnitType UnitType => unitType;
+        
+        [SerializeField] private float size;
+        public float Size => size;
+        
+        [SerializeField] private UnitStatParameters statParameters;
 
-        public float CurrentHp
-        {
-            get => currentHp;
-            set
-            {
-                if (value <= 0)
-                {
-                    DestroyUnit();
-                }
-                else
-                {
-                    currentHp = value;
-                }
-            }
-        }
-
-        [SerializeField] private float constructionPercentage;
-
-        public bool IsConstructionComplete => constructionPercentage == 1f;
-
+        [SerializeField] private Material activeMaterial;
+        [SerializeField] private Material disableMaterial;
+        [SerializeField] private MeshRenderer meshRenderer;
+        
+        public Player Owner { get; private set; }
+        public bool IsConstructed => statParameters.IsConstructed;
+        
         public void SetOwner(Player owner)
         {
-            this.Owner = owner;
+            Owner = owner;
         }
         
         protected void AssignState(State state, bool queue)
@@ -88,10 +71,25 @@ namespace Units
                 stateMachine.SetActiveState(state);
             }
         }
-
+        
         public bool CanExecuteOrderType(OrderType orderType)
         {
-            return IsConstructionComplete && orderCapability.HasFlag(orderType);
+            return IsConstructed && orderCapability.HasFlag(orderType);
+        }
+
+        public void DumpMass(float amount)
+        {
+            statParameters.DumpMass(amount);
+        }
+
+        public void StartConstruction()
+        {
+            AssignState(new ConstructionState(this, statParameters), false);    
+        }
+        
+        public void ForceConstructed()
+        {
+            statParameters.SetConstructed();
         }
         
         public void DestroyUnit()
@@ -107,21 +105,14 @@ namespace Units
             return gameObject;
         }
 
-        public void ForceCompleteConstruction()
+        public virtual void DisableUnit()
         {
-            constructionPercentage = 1f;
-            currentHp = maxHp;
+            meshRenderer.material = disableMaterial;
         }
 
-        public void Construct(EngineerParameters engineerParameters, EconomyManager economyManager)
+        public virtual void EnableUnit()
         {
-            constructionPercentage += 0.01f * Time.deltaTime;
-            currentHp += 0.01f * Time.deltaTime;
-
-            if (constructionPercentage >= 1f)
-            {
-                ForceCompleteConstruction();
-            }
+            meshRenderer.material = activeMaterial;
         }
     }
 }
